@@ -52,6 +52,7 @@ impl CandlesRenderer {
         let price_range = max_price - min_price;
         let height_range = Decimal::from(self.height - 2 * self.padding);
         let candle_width = cmp::min((self.width - 2 * self.padding) / (candles.len() as i32), 10);
+        let body_width = (candle_width as f32 * 0.7).max(1.0) as i32;
 
         let price_to_y = |price: Decimal| -> i32 {
             let relative_price = price - min_price;
@@ -87,6 +88,41 @@ impl CandlesRenderer {
                     width: 1.,
                     cap: LineCap::Round,
                     join: LineJoin::Round,
+                    ..Default::default()
+                },
+                &DrawOptions::new(),
+            );
+
+            // Draw body (open-close rectangle)
+            let body_top = open_y.min(close_y);
+            let body_bottom = open_y.max(close_y);
+            let body_height = (body_bottom - body_top).max(1);
+
+            let mut pb = PathBuilder::new();
+            pb.rect(
+                (x - body_width / 2) as f32,
+                body_top as f32,
+                body_width as f32,
+                body_height as f32,
+            );
+            let path = pb.finish();
+
+            if candle.is_bullish() {
+                // Bullish: fill with color
+                dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
+            } else {
+                // Bearish: fill with color
+                dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
+            }
+
+            // Add border to body
+            dt.stroke(
+                &path,
+                &Source::Solid(SolidSource::from_unpremultiplied_argb(
+                    0xff, 0x33, 0x33, 0x33,
+                )),
+                &StrokeStyle {
+                    width: 0.5,
                     ..Default::default()
                 },
                 &DrawOptions::new(),
