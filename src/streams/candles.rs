@@ -30,8 +30,6 @@ struct KlineData {
     close: String,
     #[serde(rename = "v")]
     volume: String,
-    #[serde(rename = "x")]
-    is_closed: bool,
 }
 
 pub async fn start_candles_stream(symbol: String, interval: String, limit: usize) -> CandlesStore {
@@ -73,9 +71,11 @@ async fn run_stream(
         })
         .collect();
 
-    let mut buffer = candles_store.write().await;
-    for candle in initial_candles {
-        buffer.push(candle);
+    {
+        let mut buffer = candles_store.write().await;
+        for candle in initial_candles {
+            buffer.push(candle);
+        }
     }
 
     // Listen on the WebSocket
@@ -91,19 +91,17 @@ async fn run_stream(
         match msg {
             Ok(Message::Text(text)) => {
                 if let Ok(event) = serde_json::from_str::<KlineEvent>(&text) {
-                    if event.kline.is_closed {
-                        let new_candle = Candle {
-                            open_time: event.kline.start_time.into(),
-                            open: Decimal::from_str(&event.kline.open).unwrap_or(Decimal::ZERO),
-                            high: Decimal::from_str(&event.kline.high).unwrap_or(Decimal::ZERO),
-                            low: Decimal::from_str(&event.kline.low).unwrap_or(Decimal::ZERO),
-                            close: Decimal::from_str(&event.kline.close).unwrap_or(Decimal::ZERO),
-                            volume: Decimal::from_str(&event.kline.volume).unwrap_or(Decimal::ZERO),
-                        };
+                    let candle = Candle {
+                        open_time: event.kline.start_time.into(),
+                        open: Decimal::from_str(&event.kline.open).unwrap_or(Decimal::ZERO),
+                        high: Decimal::from_str(&event.kline.high).unwrap_or(Decimal::ZERO),
+                        low: Decimal::from_str(&event.kline.low).unwrap_or(Decimal::ZERO),
+                        close: Decimal::from_str(&event.kline.close).unwrap_or(Decimal::ZERO),
+                        volume: Decimal::from_str(&event.kline.volume).unwrap_or(Decimal::ZERO),
+                    };
 
-                        let mut buffer = candles_store.write().await;
-                        buffer.push(new_candle);
-                    }
+                    let mut buffer = candles_store.write().await;
+                    buffer.push(candle);
                 }
             }
             Ok(Message::Close(_)) => {

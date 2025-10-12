@@ -12,6 +12,12 @@ pub struct Candle {
     pub volume: Decimal,
 }
 
+impl Candle {
+    pub fn is_bullish(&self) -> bool {
+        self.close > self.open
+    }
+}
+
 pub struct CandlesBuffer {
     data: Box<[Option<Candle>]>,
     head: usize,
@@ -30,6 +36,15 @@ impl CandlesBuffer {
     }
 
     pub fn push(&mut self, candle: Candle) {
+        if let Some(last_candle) = self.last() {
+            if last_candle.open_time == candle.open_time {
+                // Update existing candle
+                let index = (self.head + self.capacity - 1) % self.capacity;
+                self.data[index] = Some(candle);
+                return;
+            }
+        }
+        // Add new candle
         self.data[self.head] = Some(candle);
         self.head = (self.head + 1) % self.capacity;
         if self.size < self.capacity {
@@ -89,6 +104,7 @@ mod tests {
         let candle2 = create_candle(2, "105.0", "115.0", "95.0", "110.0", "1500.0");
         let candle3 = create_candle(3, "110.0", "120.0", "100.0", "115.0", "2000.0");
         let candle4 = create_candle(4, "115.0", "125.0", "105.0", "120.0", "2500.0");
+        let candle5 = create_candle(4, "116.0", "125.0", "105.0", "120.0", "2500.0");
 
         buffer.push(candle1);
         buffer.push(candle2);
@@ -106,8 +122,17 @@ mod tests {
         assert_eq!(vec[0].open_time, candle2.open_time);
         assert_eq!(vec[1].open_time, candle3.open_time);
         assert_eq!(vec[2].open_time, candle4.open_time);
+        assert_eq!(vec[2].open, candle4.open);
+
+        // test update existing
+        buffer.push(candle5);
+        let vec = buffer.to_vec();
+        assert_eq!(vec.len(), 3);
+        assert_eq!(vec[1].open_time, candle3.open_time);
+        assert_eq!(vec[2].open_time, candle5.open_time);
+        assert_eq!(vec[2].open, candle5.open);
 
         let last_candle = buffer.last().unwrap();
-        assert_eq!(last_candle.open_time, candle4.open_time);
+        assert_eq!(last_candle.open_time, candle5.open_time);
     }
 }
