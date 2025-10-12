@@ -1,3 +1,3 @@
 # Scalper
 
-A rust desktop app for scalping on Binance Futures.
+A desktop app for scalping on Binance Futures written in Rust.
