@@ -1,7 +1,5 @@
 use crate::models::{Area, Config, DomState};
-use raqote::{
-    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
-};
+use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Source, StrokeStyle};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use tokio::sync::RwLockReadGuard;
@@ -21,6 +19,7 @@ impl DomRenderer {
         dom_state: RwLockReadGuard<DomState>,
         dt: &mut DrawTarget,
         config: &Config,
+        tick_size: Decimal,
     ) {
         dt.fill_rect(
             self.area.left as f32,
@@ -31,95 +30,60 @@ impl DomRenderer {
             &DrawOptions::new(),
         );
 
-        let bids: Vec<_> = dom_state.bids.iter().collect();
-        let asks: Vec<_> = dom_state.asks.iter().collect();
+        let bids: Vec<_> = dom_state.get_bids(20, tick_size);
+        let asks: Vec<_> = dom_state.get_asks(20, tick_size);
         if bids.is_empty() && asks.is_empty() {
             return;
         }
 
-        // Find min and max price for scaling
-        let min_price = bids
-            .first()
-            .map(|(p, _)| **p)
-            .into_iter()
-            .chain(asks.first().map(|(p, _)| **p))
-            .min();
-        let max_price = bids
-            .last()
-            .map(|(p, _)| **p)
-            .into_iter()
-            .chain(asks.last().map(|(p, _)| **p))
-            .max();
-        let (min_price, max_price) = match (min_price, max_price) {
-            (Some(min), Some(max)) => (min, max),
-            (Some(min), None) => (min, min),
-            (None, Some(max)) => (max, max),
-            (None, None) => return,
-        };
-        let price_range = max_price - min_price;
-        let height_range = Decimal::from(self.area.height - 2 * self.padding);
-
-        // Find max quantity for scaling bar length
-        let max_qty = bids
+        let bar_height = 10.0;
+        let gap = 2.0;
+        let max_value = bids
             .iter()
             .chain(asks.iter())
-            .map(|(_, qty)| *qty)
-            .max_by(|a, b| a.cmp(b))
-            .cloned()
-            .unwrap_or(Decimal::ONE);
-        let max_qty_f = max_qty.to_f32().unwrap_or(1.0);
-        let bar_max_width = (self.area.width - self.area.left - 2 * self.padding) as f32;
+            .map(|(_, v)| v.to_f32().unwrap_or(0.0))
+            .fold(0.0, f32::max);
 
-        // Draw bids
-        for (price, qty) in bids {
-            let price_f = (*price - min_price).to_f32().unwrap_or(0.0);
-            let price_norm = if price_range.is_zero() {
-                0.0
+        let left = self.area.left as f32 + self.padding as f32;
+        let right = (self.area.left + self.area.width) as f32 - self.padding as f32;
+        let max_width = right - left;
+
+        // Draw bids (bottom up)
+        let mut y = (self.area.top + self.area.height) as f32 - self.padding as f32 - bar_height;
+        for (price, value) in bids {
+            let width = if max_value > 0.0 {
+                value.to_f32().unwrap_or(0.0) / max_value * max_width
             } else {
-                price_f / price_range.to_f32().unwrap_or(1.0)
+                0.0
             };
-            let y = self.area.height + self.area.top
-                - self.padding
-                - (price_norm * height_range.to_f32().unwrap_or(1.0)) as i32;
-            let bar_len = ((*qty).to_f32().unwrap_or(0.0) / max_qty_f * bar_max_width) as i32;
-            let mut pb = PathBuilder::new();
-            pb.rect(
-                (self.padding + self.area.left) as f32,
-                y as f32 - 4.0,
-                bar_len as f32,
-                8.0,
-            );
-            dt.fill(
-                &pb.finish(),
-                &Source::Solid(SolidSource::from(config.bullish_color)),
+            dt.fill_rect(
+                left,
+                y,
+                width,
+                bar_height,
+                &Source::Solid(config.bullish_color.into()),
                 &DrawOptions::new(),
             );
+            y -= bar_height + gap;
         }
 
-        // Draw asks
-        for (price, qty) in asks {
-            let price_f = (*price - min_price).to_f32().unwrap_or(0.0);
-            let price_norm = if price_range.is_zero() {
-                0.0
+        // Draw asks (top down)
+        let mut y = self.area.top as f32 + self.padding as f32;
+        for (price, value) in asks {
+            let width = if max_value > 0.0 {
+                value.to_f32().unwrap_or(0.0) / max_value * max_width
             } else {
-                price_f / price_range.to_f32().unwrap_or(1.0)
+                0.0
             };
-            let y = self.area.height + self.area.top
-                - self.padding
-                - (price_norm * height_range.to_f32().unwrap_or(1.0)) as i32;
-            let bar_len = ((*qty).to_f32().unwrap_or(0.0) / max_qty_f * bar_max_width) as i32;
-            let mut pb = PathBuilder::new();
-            pb.rect(
-                (self.area.width + self.area.left) as f32 - self.padding as f32 - bar_len as f32,
-                y as f32 - 4.0,
-                bar_len as f32,
-                8.0,
-            );
-            dt.fill(
-                &pb.finish(),
-                &Source::Solid(SolidSource::from(config.bearish_color)),
+            dt.fill_rect(
+                left,
+                y,
+                width,
+                bar_height,
+                &Source::Solid(config.bearish_color.into()),
                 &DrawOptions::new(),
             );
+            y += bar_height + gap;
         }
 
         // border

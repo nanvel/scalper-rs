@@ -3,8 +3,9 @@ use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
 use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use std::cmp;
+use std::ops::Mul;
 use tokio::sync::RwLockReadGuard;
 
 pub struct CandlesRenderer {
@@ -22,7 +23,7 @@ impl CandlesRenderer {
         candles_state: RwLockReadGuard<CandlesState>,
         dt: &mut DrawTarget,
         config: &Config,
-    ) {
+    ) -> Option<Decimal> {
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
@@ -34,9 +35,10 @@ impl CandlesRenderer {
 
         let candles = candles_state.to_vec();
         if candles.is_empty() {
-            return;
+            return None;
         }
 
+        let current_price = candles.last().unwrap().close;
         let mut min_price: Decimal = candles[0].low;
         let mut max_price: Decimal = candles[0].high;
         for candle in &candles {
@@ -49,20 +51,33 @@ impl CandlesRenderer {
         }
 
         let price_range = max_price - min_price;
-        let height_range = Decimal::from(self.area.height - 2 * self.padding);
         let candle_width = cmp::min(
             (self.area.width - 2 * self.padding) / (candles.len() as i32),
             10,
         );
         let body_width = (candle_width as f32 * 0.7).max(1.0) as i32;
 
+        let new_central_price = closest_significant(current_price, min_price, max_price);
+        let new_price_step = price_range / Decimal::from(self.area.height - self.padding * 2);
+        let new_price_step = closest_significant(
+            new_price_step,
+            new_price_step.mul(Decimal::from_f64(0.3).unwrap()),
+            new_price_step.mul(Decimal::from(3)),
+        );
+        let new_central_point = (self.area.height / 2) + self.area.top;
+
         let price_to_y = |price: Decimal| -> i32 {
-            let relative_price = price - min_price;
-            let y = height_range - (relative_price * height_range / price_range);
-            (y + Decimal::from(self.padding))
-                .to_i32()
-                .unwrap_or(self.padding)
-                + self.area.top
+            if price > new_central_price {
+                return new_central_point
+                    - ((price - new_central_price) / new_price_step)
+                        .to_i32()
+                        .unwrap_or(0);
+            } else {
+                return new_central_point
+                    + ((new_central_price - price) / new_price_step)
+                        .to_i32()
+                        .unwrap_or(0);
+            }
         };
 
         for (i, candle) in candles.iter().rev().enumerate() {
@@ -129,7 +144,6 @@ impl CandlesRenderer {
         dt.fill(&path, &Source::Solid(dot_color), &DrawOptions::new());
 
         // current price line
-        let current_price = candles.last().unwrap().close;
         let mut pb = PathBuilder::new();
         pb.move_to(self.area.left as f32, price_to_y(current_price) as f32);
         pb.line_to(
@@ -168,5 +182,32 @@ impl CandlesRenderer {
             },
             &DrawOptions::new(),
         );
+
+        Some(current_price)
     }
+}
+
+fn closest_significant(price: Decimal, lower: Decimal, upper: Decimal) -> Decimal {
+    let diff = upper - lower;
+    if diff <= Decimal::ZERO {
+        return price;
+    }
+    let diff_f = diff.to_f64().unwrap_or(0.0);
+    let magnitude = 10f64.powf(diff_f.log10().floor());
+    let steps = [1.0, 2.0, 5.0];
+    let mut best = price;
+    let mut min_dist = f64::MAX;
+    for step in steps {
+        let candidate =
+            (price.to_f64().unwrap_or(0.0) / (magnitude * step)).round() * magnitude * step;
+        if candidate >= lower.to_f64().unwrap_or(0.0) && candidate <= upper.to_f64().unwrap_or(0.0)
+        {
+            let dist = (candidate - price.to_f64().unwrap_or(0.0)).abs();
+            if dist < min_dist {
+                min_dist = dist;
+                best = Decimal::from_f64(candidate).unwrap();
+            }
+        }
+    }
+    best
 }

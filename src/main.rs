@@ -26,6 +26,7 @@ async fn main() {
         eprintln!("Error loading symbol {}: {}", symbol_slug, err);
         std::process::exit(1);
     });
+    let mut tick_size = symbol.tick_size;
 
     let config = Config::default();
 
@@ -67,7 +68,7 @@ async fn main() {
         }
 
         candles_renderer.render(candles_state.read().await, &mut dt, &config);
-        dom_renderer.render(dom_state.read().await, &mut dt, &config);
+        dom_renderer.render(dom_state.read().await, &mut dt, &config, tick_size);
         status_renderer.render(&symbol.slug, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
