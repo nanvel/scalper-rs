@@ -6,6 +6,9 @@ pub struct Config {
     pub bullish_color: Color,
     pub bearish_color: Color,
     pub background_color: Color,
+
+    pub dom_width: i32,
+    pub status_height: i32,
 }
 
 impl Default for Config {
@@ -16,6 +19,8 @@ impl Default for Config {
             bullish_color: Color::GREEN,
             bearish_color: Color::RED,
             background_color: Color::WHITE,
+            dom_width: 100,
+            status_height: 20,
         }
     }
 }

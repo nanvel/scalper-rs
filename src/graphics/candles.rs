@@ -10,14 +10,18 @@ use tokio::sync::RwLockReadGuard;
 pub struct CandlesRenderer {
     width: i32,
     height: i32,
+    offset_left: i32,
+    offset_top: i32,
     padding: i32,
 }
 
 impl CandlesRenderer {
-    pub fn new(width: i32, height: i32) -> Self {
+    pub fn new(width: i32, height: i32, offset_left: i32, offset_top: i32) -> Self {
         Self {
             width,
             height,
+            offset_left,
+            offset_top,
             padding: 10,
         }
     }
@@ -28,7 +32,14 @@ impl CandlesRenderer {
         dt: &mut DrawTarget,
         config: &Config,
     ) {
-        dt.clear(config.background_color.into());
+        dt.fill_rect(
+            self.offset_left as f32,
+            self.offset_top as f32,
+            self.width as f32,
+            self.height as f32,
+            &Source::Solid(config.background_color.into()),
+            &DrawOptions::new(),
+        );
 
         let candles = candles_state.to_vec();
         if candles.is_empty() {
@@ -57,10 +68,11 @@ impl CandlesRenderer {
             (y + Decimal::from(self.padding))
                 .to_i32()
                 .unwrap_or(self.padding)
+                + self.offset_top
         };
 
-        for (i, candle) in candles.iter().enumerate() {
-            let x = self.padding + (i as i32) * candle_width;
+        for (i, candle) in candles.iter().rev().enumerate() {
+            let x = self.width + self.offset_left - self.padding - (i as i32) * candle_width;
 
             let open_y = price_to_y(candle.open);
             let close_y = price_to_y(candle.close);
@@ -115,8 +127,8 @@ impl CandlesRenderer {
 
         let mut pb = PathBuilder::new();
         let dot_radius = 5.0;
-        let dot_x = 15.0;
-        let dot_y = dt.height() as f32 - 15.0;
+        let dot_x = self.offset_left as f32 + 15.0;
+        let dot_y = (self.offset_top + self.height) as f32 - 15.0;
         pb.arc(dot_x, dot_y, dot_radius, 0.0, 2.0 * std::f32::consts::PI);
         let path = pb.finish();
 

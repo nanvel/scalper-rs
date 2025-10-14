@@ -3,7 +3,7 @@ mod graphics;
 mod streams;
 
 use data::Config;
-use graphics::CandlesRenderer;
+use graphics::{CandlesRenderer, DomRenderer};
 use minifb::{Key, Window, WindowOptions};
 use raqote::DrawTarget;
 use std::env;
@@ -41,7 +41,9 @@ async fn main() {
     let dom_state = start_dom_stream(symbol.to_string(), 500).await;
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
-    let candles_renderer = CandlesRenderer::new(window_width as i32, window_height as i32);
+    let candles_renderer =
+        CandlesRenderer::new(window_width as i32 - 100, window_height as i32, 0, 0);
+    let dom_renderer = DomRenderer::new(100, window_height as i32, window_width as i32 - 100, 0);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let (new_width, new_height) = window.get_size() {
@@ -53,6 +55,7 @@ async fn main() {
         }
 
         candles_renderer.render(candles_state.read().await, &mut dt, &config);
+        dom_renderer.render(dom_state.read().await, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
