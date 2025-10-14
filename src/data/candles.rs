@@ -23,8 +23,11 @@ pub struct CandlesBuffer {
     head: usize,
     size: usize,
     capacity: usize,
+    pub online: bool,
+    pub updated: Timestamp,
 }
 
+/// Circular buffer for candles
 impl CandlesBuffer {
     pub fn new(capacity: usize) -> Self {
         Self {
@@ -32,6 +35,8 @@ impl CandlesBuffer {
             head: 0,
             size: 0,
             capacity,
+            online: false,
+            updated: Timestamp::now(),
         }
     }
 

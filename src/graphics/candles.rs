@@ -1,10 +1,11 @@
-use crate::data::{Candle, Color};
+use crate::data::{CandlesBuffer, Color, Config};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::cmp;
+use tokio::sync::RwLockReadGuard;
 
 pub struct CandlesRenderer {
     width: i32,
@@ -23,24 +24,24 @@ impl CandlesRenderer {
         }
     }
 
-    pub fn render(&self, candles: &[Candle]) -> DrawTarget {
-        let mut dt = DrawTarget::new(self.width, self.height);
+    pub fn render(
+        &self,
+        candles_buffer: RwLockReadGuard<CandlesBuffer>,
+        dt: &mut DrawTarget,
+        config: &Config,
+    ) {
+        dt.clear(self.bg_color.into());
 
-        dt.clear(SolidSource::from_unpremultiplied_argb(
-            self.bg_color.a,
-            self.bg_color.r,
-            self.bg_color.g,
-            self.bg_color.b,
-        ));
+        let candles = candles_buffer.to_vec();
 
         if candles.is_empty() {
-            return dt;
+            return;
         }
 
         let mut min_price: Decimal = candles[0].low;
         let mut max_price: Decimal = candles[0].high;
 
-        for candle in candles {
+        for candle in &candles {
             if candle.low < min_price {
                 min_price = candle.low;
             }
@@ -70,10 +71,10 @@ impl CandlesRenderer {
             let high_y = price_to_y(candle.high);
             let low_y = price_to_y(candle.low);
 
-            let color = if candle.is_bullish() {
-                SolidSource::from_unpremultiplied_argb(255, 0, 170, 0) // Green
+            let color: SolidSource = if candle.is_bullish() {
+                Color::GREEN.into()
             } else {
-                SolidSource::from_unpremultiplied_argb(255, 204, 0, 0) // Red
+                Color::RED.into()
             };
 
             let mut pb = PathBuilder::new();
@@ -118,9 +119,7 @@ impl CandlesRenderer {
             // Add border to body
             dt.stroke(
                 &path,
-                &Source::Solid(SolidSource::from_unpremultiplied_argb(
-                    0xff, 0x33, 0x33, 0x33,
-                )),
+                &Source::Solid(Color::GRAY.into()),
                 &StrokeStyle {
                     width: 0.5,
                     ..Default::default()
@@ -129,6 +128,19 @@ impl CandlesRenderer {
             );
         }
 
-        dt
+        let dot_color: SolidSource = if candles_buffer.online {
+            Color::GREEN.into()
+        } else {
+            Color::RED.into()
+        };
+
+        let mut pb = PathBuilder::new();
+        let dot_radius = 5.0;
+        let dot_x = 15.0;
+        let dot_y = dt.height() as f32 - 15.0;
+        pb.arc(dot_x, dot_y, dot_radius, 0.0, 2.0 * std::f32::consts::PI);
+        let path = pb.finish();
+
+        dt.fill(&path, &Source::Solid(dot_color), &DrawOptions::new());
     }
 }

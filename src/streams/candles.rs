@@ -1,4 +1,4 @@
-use crate::data::{Candle, CandlesBuffer};
+use crate::data::{Candle, CandlesBuffer, Timestamp};
 use futures_util::stream::StreamExt;
 use reqwest;
 use rust_decimal::Decimal;
@@ -14,6 +14,8 @@ pub type CandlesStore = Arc<RwLock<CandlesBuffer>>;
 struct KlineEvent {
     #[serde(rename = "k")]
     kline: KlineData,
+    #[serde(rename = "E")]
+    event_time: u64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,13 +104,19 @@ async fn run_stream(
 
                     let mut buffer = candles_store.write().await;
                     buffer.push(candle);
+                    buffer.updated = event.event_time.into();
+                    buffer.online = true;
                 }
             }
             Ok(Message::Close(_)) => {
+                let mut buffer = candles_store.write().await;
+                buffer.online = false;
                 println!("WebSocket closed");
                 break;
             }
             Err(e) => {
+                let mut buffer = candles_store.write().await;
+                buffer.online = false;
                 eprintln!("Error: {}", e);
                 break;
             }
