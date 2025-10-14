@@ -47,18 +47,22 @@ async fn main() {
     let dom_state = start_dom_stream(symbol.slug.to_string(), 500).await;
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
-
-    let layout = Layout::new(window_width as i32, window_height as i32, &config);
-    let candles_renderer = CandlesRenderer::new(layout.candles_area);
-    let dom_renderer = DomRenderer::new(layout.dom_area);
-    let status_renderer = StatusRenderer::new(layout.status_area);
+    let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
+    let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
+    let mut dom_renderer = DomRenderer::new(layout.dom_area);
+    let mut status_renderer = StatusRenderer::new(layout.status_area);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let (new_width, new_height) = window.get_size() {
             if new_width != window_width || new_height != window_height {
                 window_width = new_width;
                 window_height = new_height;
+
                 dt = DrawTarget::new(window_width as i32, window_height as i32);
+                layout = Layout::new(window_width as i32, window_height as i32, &config);
+                candles_renderer = CandlesRenderer::new(layout.candles_area);
+                dom_renderer = DomRenderer::new(layout.dom_area);
+                status_renderer = StatusRenderer::new(layout.status_area);
             }
         }
 

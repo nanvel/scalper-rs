@@ -1,5 +1,6 @@
 use super::timestamp::Timestamp;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use std::collections::BTreeMap;
 
 pub struct DomState {
@@ -38,5 +39,62 @@ impl DomState {
         } else {
             self.asks.insert(price, quantity);
         }
+    }
+
+    pub fn get_asks(&self, n: u32, tick_size: Decimal) -> Vec<(Decimal, Decimal)> {
+        let min_price = self.asks.keys().next().cloned().unwrap_or(Decimal::ZERO);
+        let min_price = (min_price / tick_size).floor() * tick_size;
+        let mut buckets = vec![Decimal::ZERO; n as usize];
+
+        for (&price, &qty) in &self.asks {
+            let index = ((price - min_price) / tick_size)
+                .to_u32()
+                .unwrap_or(u32::MAX);
+            if index < n {
+                buckets[index as usize] += qty;
+            } else {
+                break;
+            }
+        }
+
+        (0..n)
+            .map(|i| {
+                (
+                    min_price + tick_size * Decimal::from(i),
+                    buckets[i as usize],
+                )
+            })
+            .collect()
+    }
+
+    pub fn get_bids(&self, n: u32, tick_size: Decimal) -> Vec<(Decimal, Decimal)> {
+        let max_price = self
+            .bids
+            .keys()
+            .next_back()
+            .cloned()
+            .unwrap_or(Decimal::ZERO);
+        let max_price = (max_price / tick_size).floor() * tick_size;
+        let mut buckets = vec![Decimal::ZERO; n as usize];
+
+        for (&price, &qty) in self.bids.iter().rev() {
+            let index = ((max_price - price) / tick_size)
+                .to_u32()
+                .unwrap_or(u32::MAX);
+            if index < n {
+                buckets[index as usize] += qty;
+            } else {
+                break;
+            }
+        }
+
+        (0..n)
+            .map(|i| {
+                (
+                    max_price - tick_size * Decimal::from(i),
+                    buckets[i as usize],
+                )
+            })
+            .collect()
     }
 }
