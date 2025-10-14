@@ -133,5 +133,30 @@ impl CandlesRenderer {
         let path = pb.finish();
 
         dt.fill(&path, &Source::Solid(dot_color), &DrawOptions::new());
+
+        // current price line
+        let current_price = candles.last().unwrap().close;
+        let mut pb = PathBuilder::new();
+        pb.move_to(
+            (self.offset_left + self.padding) as f32,
+            price_to_y(current_price) as f32,
+        );
+        pb.line_to(
+            (self.offset_left + self.width - self.padding * 2) as f32,
+            price_to_y(current_price) as f32,
+        );
+        let path = pb.finish();
+
+        dt.stroke(
+            &path,
+            &Source::Solid(config.current_price_color.into()),
+            &StrokeStyle {
+                width: 1.0,
+                cap: LineCap::Round,
+                join: LineJoin::Round,
+                ..Default::default()
+            },
+            &DrawOptions::new(),
+        );
     }
 }

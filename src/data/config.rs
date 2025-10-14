@@ -7,6 +7,7 @@ pub struct Config {
     pub bearish_color: Color,
     pub background_color: Color,
     pub text_color: Color,
+    pub current_price_color: Color,
 
     pub dom_width: i32,
     pub status_height: i32,
@@ -21,6 +22,7 @@ impl Default for Config {
             bearish_color: Color::RED,
             background_color: Color::WHITE,
             text_color: Color::BLACK,
+            current_price_color: Color::GRAY,
             dom_width: 100,
             status_height: 20,
         }
