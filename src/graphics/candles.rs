@@ -1,4 +1,4 @@
-use crate::data::{CandlesBuffer, Color, Config};
+use crate::data::{CandlesBuffer, Config};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
@@ -11,7 +11,6 @@ pub struct CandlesRenderer {
     width: i32,
     height: i32,
     padding: i32,
-    bg_color: Color,
 }
 
 impl CandlesRenderer {
@@ -20,7 +19,6 @@ impl CandlesRenderer {
             width,
             height,
             padding: 10,
-            bg_color: Color::WHITE,
         }
     }
 
@@ -30,7 +28,7 @@ impl CandlesRenderer {
         dt: &mut DrawTarget,
         config: &Config,
     ) {
-        dt.clear(self.bg_color.into());
+        dt.clear(config.background_color.into());
 
         let candles = candles_buffer.to_vec();
 
@@ -72,9 +70,9 @@ impl CandlesRenderer {
             let low_y = price_to_y(candle.low);
 
             let color: SolidSource = if candle.is_bullish() {
-                Color::GREEN.into()
+                config.bullish_color.into()
             } else {
-                Color::RED.into()
+                config.bearish_color.into()
             };
 
             let mut pb = PathBuilder::new();
@@ -108,30 +106,13 @@ impl CandlesRenderer {
             );
             let path = pb.finish();
 
-            if candle.is_bullish() {
-                // Bullish: fill with color
-                dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
-            } else {
-                // Bearish: fill with color
-                dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
-            }
-
-            // Add border to body
-            dt.stroke(
-                &path,
-                &Source::Solid(Color::GRAY.into()),
-                &StrokeStyle {
-                    width: 0.5,
-                    ..Default::default()
-                },
-                &DrawOptions::new(),
-            );
+            dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
         }
 
         let dot_color: SolidSource = if candles_buffer.online {
-            Color::GREEN.into()
+            config.online_color.into()
         } else {
-            Color::RED.into()
+            config.offline_color.into()
         };
 
         let mut pb = PathBuilder::new();
