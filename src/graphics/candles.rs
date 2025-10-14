@@ -1,4 +1,4 @@
-use crate::models::{Area, CandlesState, Config};
+use crate::models::{Area, CandlesState, Config, Scale};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
@@ -23,7 +23,8 @@ impl CandlesRenderer {
         candles_state: RwLockReadGuard<CandlesState>,
         dt: &mut DrawTarget,
         config: &Config,
-    ) -> Option<Decimal> {
+        scale: &mut Scale,
+    ) {
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
@@ -35,7 +36,7 @@ impl CandlesRenderer {
 
         let candles = candles_state.to_vec();
         if candles.is_empty() {
-            return None;
+            return;
         }
 
         let current_price = candles.last().unwrap().close;
@@ -58,23 +59,29 @@ impl CandlesRenderer {
         let body_width = (candle_width as f32 * 0.7).max(1.0) as i32;
 
         let new_central_price = closest_significant(current_price, min_price, max_price);
-        let new_price_step = price_range / Decimal::from(self.area.height - self.padding * 2);
-        let new_price_step = closest_significant(
-            new_price_step,
-            new_price_step.mul(Decimal::from_f64(0.3).unwrap()),
-            new_price_step.mul(Decimal::from(3)),
-        );
-        let new_central_point = (self.area.height / 2) + self.area.top;
+        if scale.central_price.is_zero()
+            || (scale.central_price - new_central_price).abs() > price_range / Decimal::from(4)
+        {
+            let price_to_points = price_range / Decimal::from(self.area.height - self.padding * 2);
+            let price_to_points = closest_significant(
+                price_to_points,
+                price_to_points.mul(Decimal::from_f64(0.3).unwrap()),
+                price_to_points.mul(Decimal::from(3)),
+            );
+            scale.price_to_points = price_to_points;
+            scale.central_price = new_central_price;
+            scale.central_point = (self.area.height / 2) + self.area.top;
+        }
 
         let price_to_y = |price: Decimal| -> i32 {
-            if price > new_central_price {
-                return new_central_point
-                    - ((price - new_central_price) / new_price_step)
+            if price > scale.central_price {
+                return scale.central_point
+                    - ((price - scale.central_price) / scale.price_to_points)
                         .to_i32()
                         .unwrap_or(0);
             } else {
-                return new_central_point
-                    + ((new_central_price - price) / new_price_step)
+                return scale.central_point
+                    + ((scale.central_price - price) / scale.price_to_points)
                         .to_i32()
                         .unwrap_or(0);
             }
@@ -182,8 +189,6 @@ impl CandlesRenderer {
             },
             &DrawOptions::new(),
         );
-
-        Some(current_price)
     }
 }
 

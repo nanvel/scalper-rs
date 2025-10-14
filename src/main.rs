@@ -6,7 +6,7 @@ use binance::api::load_symbol;
 use binance::streams::{start_candles_stream, start_dom_stream};
 use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
-use models::{Config, Layout};
+use models::{Config, Layout, Scale};
 use raqote::DrawTarget;
 use std::env;
 use tokio::time::{Duration, sleep};
@@ -49,6 +49,7 @@ async fn main() {
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
+    let mut scale = Scale::default();
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
     let mut dom_renderer = DomRenderer::new(layout.dom_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
@@ -61,13 +62,14 @@ async fn main() {
 
                 dt = DrawTarget::new(window_width as i32, window_height as i32);
                 layout = Layout::new(window_width as i32, window_height as i32, &config);
+                scale = Scale::default();
                 candles_renderer = CandlesRenderer::new(layout.candles_area);
                 dom_renderer = DomRenderer::new(layout.dom_area);
                 status_renderer = StatusRenderer::new(layout.status_area);
             }
         }
 
-        candles_renderer.render(candles_state.read().await, &mut dt, &config);
+        candles_renderer.render(candles_state.read().await, &mut dt, &config, &mut scale);
         dom_renderer.render(dom_state.read().await, &mut dt, &config, tick_size);
         status_renderer.render(&symbol.slug, &mut dt, &config);
 
