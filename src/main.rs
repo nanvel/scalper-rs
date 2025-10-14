@@ -1,13 +1,14 @@
+mod binance;
 mod graphics;
 mod models;
-mod streams;
 
+use binance::api::load_symbol;
+use binance::streams::{start_candles_stream, start_dom_stream};
 use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
 use models::{Config, Layout};
 use raqote::DrawTarget;
 use std::env;
-use streams::{start_candles_stream, start_dom_stream};
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
@@ -20,14 +21,20 @@ async fn main() {
         std::process::exit(1);
     }
 
-    let symbol = &args[1];
+    let symbol_slug = &args[1];
+    let symbol = load_symbol(&symbol_slug).await.unwrap_or_else(|err| {
+        eprintln!("Error loading symbol {}: {}", symbol_slug, err);
+        std::process::exit(1);
+    });
+    dbg!(symbol);
+
     let config = Config::default();
 
     let mut window_width = 800;
     let mut window_height = 600;
 
     let mut window = Window::new(
-        &format!("Scalper - {symbol}"),
+        &format!("Scalper - {}", symbol.slug),
         window_width,
         window_height,
         WindowOptions {
@@ -37,8 +44,8 @@ async fn main() {
     )
     .unwrap();
 
-    let candles_state = start_candles_stream(symbol.to_string(), "5m".to_string(), 100).await;
-    let dom_state = start_dom_stream(symbol.to_string(), 500).await;
+    let candles_state = start_candles_stream(symbol.slug.to_string(), "5m".to_string(), 100).await;
+    let dom_state = start_dom_stream(symbol.slug.to_string(), 500).await;
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
 
@@ -58,7 +65,7 @@ async fn main() {
 
         candles_renderer.render(candles_state.read().await, &mut dt, &config);
         dom_renderer.render(dom_state.read().await, &mut dt, &config);
-        status_renderer.render(symbol, &mut dt, &config);
+        status_renderer.render(&symbol.slug, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
