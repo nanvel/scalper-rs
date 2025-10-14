@@ -7,7 +7,7 @@ use graphics::CandlesRenderer;
 use minifb::{Key, Window, WindowOptions};
 use raqote::DrawTarget;
 use std::env;
-use streams::start_candles_stream;
+use streams::{start_candles_stream, start_dom_stream};
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
@@ -37,10 +37,11 @@ async fn main() {
     )
     .unwrap();
 
-    let candles_store = start_candles_stream(symbol.to_string(), "5m".to_string(), 100).await;
+    let candles_state = start_candles_stream(symbol.to_string(), "5m".to_string(), 100).await;
+    let dom_state = start_dom_stream(symbol.to_string(), 500).await;
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
-    let renderer = CandlesRenderer::new(window_width as i32, window_height as i32);
+    let candles_renderer = CandlesRenderer::new(window_width as i32, window_height as i32);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let (new_width, new_height) = window.get_size() {
@@ -51,10 +52,7 @@ async fn main() {
             }
         }
 
-        {
-            let candles_buffer = candles_store.read().await;
-            renderer.render(candles_buffer, &mut dt, &config);
-        }
+        candles_renderer.render(candles_state.read().await, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window

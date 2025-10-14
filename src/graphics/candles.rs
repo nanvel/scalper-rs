@@ -1,4 +1,4 @@
-use crate::data::{CandlesBuffer, Config};
+use crate::data::{CandlesState, Config};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
@@ -24,21 +24,19 @@ impl CandlesRenderer {
 
     pub fn render(
         &self,
-        candles_buffer: RwLockReadGuard<CandlesBuffer>,
+        candles_state: RwLockReadGuard<CandlesState>,
         dt: &mut DrawTarget,
         config: &Config,
     ) {
         dt.clear(config.background_color.into());
 
-        let candles = candles_buffer.to_vec();
-
+        let candles = candles_state.to_vec();
         if candles.is_empty() {
             return;
         }
 
         let mut min_price: Decimal = candles[0].low;
         let mut max_price: Decimal = candles[0].high;
-
         for candle in &candles {
             if candle.low < min_price {
                 min_price = candle.low;
@@ -109,7 +107,7 @@ impl CandlesRenderer {
             dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
         }
 
-        let dot_color: SolidSource = if candles_buffer.online {
+        let dot_color: SolidSource = if candles_state.online {
             config.online_color.into()
         } else {
             config.offline_color.into()

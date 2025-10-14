@@ -1,4 +1,4 @@
-use crate::data::{Candle, CandlesBuffer, Timestamp};
+use crate::data::{Candle, CandlesState, Timestamp};
 use futures_util::stream::StreamExt;
 use reqwest;
 use rust_decimal::Decimal;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-pub type CandlesStore = Arc<RwLock<CandlesBuffer>>;
+pub type CandlesStore = Arc<RwLock<CandlesState>>;
 
 #[derive(Debug, Deserialize)]
 struct KlineEvent {
@@ -35,7 +35,7 @@ struct KlineData {
 }
 
 pub async fn start_candles_stream(symbol: String, interval: String, limit: usize) -> CandlesStore {
-    let candles_store = Arc::new(RwLock::new(CandlesBuffer::new(limit)));
+    let candles_store = Arc::new(RwLock::new(CandlesState::new(limit)));
     let candles_store_clone = candles_store.clone();
 
     tokio::spawn(async move {

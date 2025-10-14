@@ -18,7 +18,7 @@ impl Candle {
     }
 }
 
-pub struct CandlesBuffer {
+pub struct CandlesState {
     data: Box<[Option<Candle>]>,
     head: usize,
     size: usize,
@@ -28,7 +28,7 @@ pub struct CandlesBuffer {
 }
 
 /// Circular buffer for candles
-impl CandlesBuffer {
+impl CandlesState {
     pub fn new(capacity: usize) -> Self {
         Self {
             data: vec![None; capacity].into_boxed_slice(),
@@ -79,7 +79,7 @@ impl CandlesBuffer {
 
 #[cfg(test)]
 mod tests {
-    use super::{Candle, CandlesBuffer};
+    use super::{Candle, CandlesState};
     use rust_decimal::Decimal;
     use std::str::FromStr;
 
@@ -103,7 +103,7 @@ mod tests {
 
     #[test]
     fn test_candles_buffer_push_and_to_vec() {
-        let mut buffer = CandlesBuffer::new(3);
+        let mut buffer = CandlesState::new(3);
 
         let candle1 = create_candle(1, "100.0", "110.0", "90.0", "105.0", "1000.0");
         let candle2 = create_candle(2, "105.0", "115.0", "95.0", "110.0", "1500.0");
