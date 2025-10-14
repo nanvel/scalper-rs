@@ -1,4 +1,4 @@
-use crate::models::{Area, Config, DomState};
+use crate::models::{Area, Config, DomState, Scale};
 use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Source, StrokeStyle};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -19,7 +19,7 @@ impl DomRenderer {
         dom_state: RwLockReadGuard<DomState>,
         dt: &mut DrawTarget,
         config: &Config,
-        tick_size: Decimal,
+        scale: &Scale,
     ) {
         dt.fill_rect(
             self.area.left as f32,
@@ -30,14 +30,16 @@ impl DomRenderer {
             &DrawOptions::new(),
         );
 
+        let tick_size = Decimal::from(self.area.height / 10) * scale.price_to_points;
+
         let bids: Vec<_> = dom_state.get_bids(20, tick_size);
         let asks: Vec<_> = dom_state.get_asks(20, tick_size);
         if bids.is_empty() && asks.is_empty() {
             return;
         }
 
-        let bar_height = 10.0;
-        let gap = 2.0;
+        let bar_height = 9.0;
+        let gap = 1.0;
         let max_value = bids
             .iter()
             .chain(asks.iter())
@@ -49,8 +51,11 @@ impl DomRenderer {
         let max_width = right - left;
 
         // Draw bids (bottom up)
-        let mut y = (self.area.top + self.area.height) as f32 - self.padding as f32 - bar_height;
         for (price, value) in bids {
+            let y = (scale.central_point + self.area.top) as f32
+                + ((scale.central_price - price) * scale.price_to_points)
+                    .to_f32()
+                    .unwrap();
             let width = if max_value > 0.0 {
                 value.to_f32().unwrap_or(0.0) / max_value * max_width
             } else {
@@ -64,12 +69,14 @@ impl DomRenderer {
                 &Source::Solid(config.bullish_color.into()),
                 &DrawOptions::new(),
             );
-            y -= bar_height + gap;
         }
 
         // Draw asks (top down)
-        let mut y = self.area.top as f32 + self.padding as f32;
         for (price, value) in asks {
+            let y = (scale.central_point + self.area.top) as f32
+                - ((price - scale.central_price) * scale.price_to_points)
+                    .to_f32()
+                    .unwrap();
             let width = if max_value > 0.0 {
                 value.to_f32().unwrap_or(0.0) / max_value * max_width
             } else {
@@ -77,13 +84,12 @@ impl DomRenderer {
             };
             dt.fill_rect(
                 left,
-                y,
+                y - 10.,
                 width,
                 bar_height,
                 &Source::Solid(config.bearish_color.into()),
                 &DrawOptions::new(),
             );
-            y += bar_height + gap;
         }
 
         // border

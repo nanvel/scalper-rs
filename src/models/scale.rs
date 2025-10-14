@@ -4,6 +4,7 @@ pub struct Scale {
     pub central_price: Decimal,
     pub central_point: i32,
     pub price_to_points: Decimal,
+    pub dom_tick: Decimal,
 }
 
 impl Default for Scale {
@@ -12,6 +13,7 @@ impl Default for Scale {
             central_price: Decimal::ZERO,
             central_point: 0,
             price_to_points: Decimal::ONE,
+            dom_tick: Decimal::ZERO,
         }
     }
 }

@@ -70,7 +70,7 @@ async fn main() {
         }
 
         candles_renderer.render(candles_state.read().await, &mut dt, &config, &mut scale);
-        dom_renderer.render(dom_state.read().await, &mut dt, &config, tick_size);
+        dom_renderer.render(dom_state.read().await, &mut dt, &config, &scale);
         status_renderer.render(&symbol.slug, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
