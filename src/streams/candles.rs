@@ -1,4 +1,4 @@
-use crate::data::{Candle, CandlesState, Timestamp};
+use crate::models::{Candle, CandlesState, Timestamp};
 use futures_util::stream::StreamExt;
 use reqwest;
 use rust_decimal::Decimal;

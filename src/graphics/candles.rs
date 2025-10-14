@@ -1,4 +1,4 @@
-use crate::data::{CandlesState, Config};
+use crate::models::{Area, CandlesState, Config};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
@@ -8,22 +8,13 @@ use std::cmp;
 use tokio::sync::RwLockReadGuard;
 
 pub struct CandlesRenderer {
-    width: i32,
-    height: i32,
-    offset_left: i32,
-    offset_top: i32,
+    area: Area,
     padding: i32,
 }
 
 impl CandlesRenderer {
-    pub fn new(width: i32, height: i32, offset_left: i32, offset_top: i32) -> Self {
-        Self {
-            width,
-            height,
-            offset_left,
-            offset_top,
-            padding: 10,
-        }
+    pub fn new(area: Area) -> Self {
+        Self { area, padding: 10 }
     }
 
     pub fn render(
@@ -33,10 +24,10 @@ impl CandlesRenderer {
         config: &Config,
     ) {
         dt.fill_rect(
-            self.offset_left as f32,
-            self.offset_top as f32,
-            self.width as f32,
-            self.height as f32,
+            self.area.left as f32,
+            self.area.top as f32,
+            self.area.width as f32,
+            self.area.height as f32,
             &Source::Solid(config.background_color.into()),
             &DrawOptions::new(),
         );
@@ -58,8 +49,11 @@ impl CandlesRenderer {
         }
 
         let price_range = max_price - min_price;
-        let height_range = Decimal::from(self.height - 2 * self.padding);
-        let candle_width = cmp::min((self.width - 2 * self.padding) / (candles.len() as i32), 10);
+        let height_range = Decimal::from(self.area.height - 2 * self.padding);
+        let candle_width = cmp::min(
+            (self.area.width - 2 * self.padding) / (candles.len() as i32),
+            10,
+        );
         let body_width = (candle_width as f32 * 0.7).max(1.0) as i32;
 
         let price_to_y = |price: Decimal| -> i32 {
@@ -68,11 +62,11 @@ impl CandlesRenderer {
             (y + Decimal::from(self.padding))
                 .to_i32()
                 .unwrap_or(self.padding)
-                + self.offset_top
+                + self.area.top
         };
 
         for (i, candle) in candles.iter().rev().enumerate() {
-            let x = self.width + self.offset_left - self.padding - (i as i32) * candle_width;
+            let x = self.area.width + self.area.left - self.padding - (i as i32) * candle_width;
 
             let open_y = price_to_y(candle.open);
             let close_y = price_to_y(candle.close);
@@ -127,8 +121,8 @@ impl CandlesRenderer {
 
         let mut pb = PathBuilder::new();
         let dot_radius = 5.0;
-        let dot_x = self.offset_left as f32 + 15.0;
-        let dot_y = (self.offset_top + self.height) as f32 - 15.0;
+        let dot_x = self.area.left as f32 + 15.0;
+        let dot_y = (self.area.top + self.area.height) as f32 - 15.0;
         pb.arc(dot_x, dot_y, dot_radius, 0.0, 2.0 * std::f32::consts::PI);
         let path = pb.finish();
 
@@ -138,11 +132,11 @@ impl CandlesRenderer {
         let current_price = candles.last().unwrap().close;
         let mut pb = PathBuilder::new();
         pb.move_to(
-            (self.offset_left + self.padding) as f32,
+            (self.area.left + self.padding) as f32,
             price_to_y(current_price) as f32,
         );
         pb.line_to(
-            (self.offset_left + self.width - self.padding * 2) as f32,
+            (self.area.left + self.area.width - self.padding * 2) as f32,
             price_to_y(current_price) as f32,
         );
         let path = pb.finish();

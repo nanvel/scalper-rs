@@ -1,4 +1,4 @@
-use crate::data::DomState;
+use crate::models::DomState;
 use futures_util::stream::StreamExt;
 use reqwest;
 use rust_decimal::Decimal;

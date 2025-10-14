@@ -1,26 +1,17 @@
-use crate::data::{Config, DomState};
+use crate::models::{Area, Config, DomState};
 use raqote::{DrawOptions, DrawTarget, PathBuilder, SolidSource, Source};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use tokio::sync::RwLockReadGuard;
 
 pub struct DomRenderer {
-    width: i32,
-    height: i32,
-    offset_left: i32,
-    offset_top: i32,
+    area: Area,
     padding: i32,
 }
 
 impl DomRenderer {
-    pub fn new(width: i32, height: i32, offset_left: i32, offset_top: i32) -> Self {
-        Self {
-            width,
-            height,
-            offset_left,
-            offset_top,
-            padding: 10,
-        }
+    pub fn new(area: Area) -> Self {
+        Self { area, padding: 10 }
     }
 
     pub fn render(
@@ -30,10 +21,10 @@ impl DomRenderer {
         config: &Config,
     ) {
         dt.fill_rect(
-            self.offset_left as f32,
-            self.offset_top as f32,
-            self.width as f32,
-            self.height as f32,
+            self.area.left as f32,
+            self.area.top as f32,
+            self.area.width as f32,
+            self.area.height as f32,
             &Source::Solid(config.background_color.into()),
             &DrawOptions::new(),
         );
@@ -64,7 +55,7 @@ impl DomRenderer {
             (None, None) => return,
         };
         let price_range = max_price - min_price;
-        let height_range = Decimal::from(self.height - 2 * self.padding);
+        let height_range = Decimal::from(self.area.height - 2 * self.padding);
 
         // Find max quantity for scaling bar length
         let max_qty = bids
@@ -75,7 +66,7 @@ impl DomRenderer {
             .cloned()
             .unwrap_or(Decimal::ONE);
         let max_qty_f = max_qty.to_f32().unwrap_or(1.0);
-        let bar_max_width = (self.width - self.offset_left - 2 * self.padding) as f32;
+        let bar_max_width = (self.area.width - self.area.left - 2 * self.padding) as f32;
 
         // Draw bids
         for (price, qty) in bids {
@@ -85,13 +76,13 @@ impl DomRenderer {
             } else {
                 price_f / price_range.to_f32().unwrap_or(1.0)
             };
-            let y = self.height + self.offset_top
+            let y = self.area.height + self.area.top
                 - self.padding
                 - (price_norm * height_range.to_f32().unwrap_or(1.0)) as i32;
             let bar_len = ((*qty).to_f32().unwrap_or(0.0) / max_qty_f * bar_max_width) as i32;
             let mut pb = PathBuilder::new();
             pb.rect(
-                (self.padding + self.offset_left) as f32,
+                (self.padding + self.area.left) as f32,
                 y as f32 - 4.0,
                 bar_len as f32,
                 8.0,
@@ -111,13 +102,13 @@ impl DomRenderer {
             } else {
                 price_f / price_range.to_f32().unwrap_or(1.0)
             };
-            let y = self.height + self.offset_top
+            let y = self.area.height + self.area.top
                 - self.padding
                 - (price_norm * height_range.to_f32().unwrap_or(1.0)) as i32;
             let bar_len = ((*qty).to_f32().unwrap_or(0.0) / max_qty_f * bar_max_width) as i32;
             let mut pb = PathBuilder::new();
             pb.rect(
-                (self.width + self.offset_left) as f32 - self.padding as f32 - bar_len as f32,
+                (self.area.width + self.area.left) as f32 - self.padding as f32 - bar_len as f32,
                 y as f32 - 4.0,
                 bar_len as f32,
                 8.0,

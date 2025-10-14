@@ -11,6 +11,8 @@ pub struct Config {
 
     pub dom_width: i32,
     pub status_height: i32,
+    pub row_height: i32,
+    pub border_width: i32,
 }
 
 impl Default for Config {
@@ -25,6 +27,8 @@ impl Default for Config {
             current_price_color: Color::GRAY,
             dom_width: 100,
             status_height: 20,
+            row_height: 10,
+            border_width: 1,
         }
     }
 }

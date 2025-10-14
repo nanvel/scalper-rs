@@ -1,10 +1,10 @@
-mod data;
 mod graphics;
+mod models;
 mod streams;
 
-use data::Config;
 use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
+use models::{Config, Layout};
 use raqote::DrawTarget;
 use std::env;
 use streams::{start_candles_stream, start_dom_stream};
@@ -41,16 +41,11 @@ async fn main() {
     let dom_state = start_dom_stream(symbol.to_string(), 500).await;
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
-    let candles_renderer =
-        CandlesRenderer::new(window_width as i32 - 100, (window_height - 20) as i32, 0, 0);
-    let dom_renderer = DomRenderer::new(
-        100,
-        (window_height - 20) as i32,
-        window_width as i32 - 100,
-        0,
-    );
-    let status_renderer =
-        StatusRenderer::new(window_width as i32, 20, 0, window_height as i32 - 20);
+
+    let layout = Layout::new(window_width as i32, window_height as i32, &config);
+    let candles_renderer = CandlesRenderer::new(layout.candles_area);
+    let dom_renderer = DomRenderer::new(layout.dom_area);
+    let status_renderer = StatusRenderer::new(layout.status_area);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let (new_width, new_height) = window.get_size() {
