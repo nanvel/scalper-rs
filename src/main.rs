@@ -26,7 +26,6 @@ async fn main() {
         eprintln!("Error loading symbol {}: {}", symbol_slug, err);
         std::process::exit(1);
     });
-    dbg!(symbol);
 
     let config = Config::default();
 
