@@ -31,24 +31,7 @@ struct KlineData {
     volume: String,
 }
 
-pub async fn start_candles_stream(
-    symbol: String,
-    interval: String,
-    limit: usize,
-) -> SharedCandlesState {
-    let candles_store = Arc::new(RwLock::new(CandlesState::new(limit)));
-    let candles_store_clone = candles_store.clone();
-
-    tokio::spawn(async move {
-        if let Err(e) = run_stream(symbol, interval, limit, candles_store_clone).await {
-            eprintln!("Candles stream error: {}", e)
-        }
-    });
-
-    candles_store
-}
-
-async fn run_stream(
+pub async fn run_candles_stream(
     symbol: String,
     interval: String,
     limit: usize,

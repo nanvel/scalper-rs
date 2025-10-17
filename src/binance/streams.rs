@@ -1,5 +1,5 @@
 mod candles;
 mod dom;
 
-pub use candles::start_candles_stream;
-pub use dom::start_dom_stream;
+pub use candles::run_candles_stream;
+pub use dom::run_dom_stream;

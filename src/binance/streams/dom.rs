@@ -27,20 +27,7 @@ struct DepthUpdateEvent {
     event_time: u64,
 }
 
-pub async fn start_dom_stream(symbol: String, limit: usize) -> SharedDomState {
-    let dom_store = Arc::new(RwLock::new(DomState::new()));
-    let dom_store_clone = dom_store.clone();
-
-    tokio::spawn(async move {
-        if let Err(e) = run_dom_stream(symbol, limit, dom_store_clone).await {
-            eprintln!("DOM stream error: {}", e)
-        }
-    });
-
-    dom_store
-}
-
-async fn run_dom_stream(
+pub async fn run_dom_stream(
     symbol: String,
     limit: usize,
     shared_dom_state: SharedDomState,

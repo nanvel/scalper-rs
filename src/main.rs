@@ -1,15 +1,18 @@
 mod binance;
 mod graphics;
 mod models;
+mod use_cases;
 
 use binance::api::load_symbol;
-use binance::streams::{start_candles_stream, start_dom_stream};
 use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
+use models::{CandlesState, DomState};
 use models::{Config, Layout, Scale};
 use raqote::DrawTarget;
 use std::env;
+use std::sync::{Arc, RwLock};
 use tokio::time::{Duration, sleep};
+use use_cases::listen_streams::listen_streams;
 
 #[tokio::main]
 async fn main() {
@@ -44,8 +47,19 @@ async fn main() {
     )
     .unwrap();
 
-    let candles_state = start_candles_stream(symbol.slug.to_string(), "5m".to_string(), 100).await;
-    let dom_state = start_dom_stream(symbol.slug.to_string(), 500).await;
+    let candles_limit = 100;
+    let candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
+    let dom_state = Arc::new(RwLock::new(DomState::new()));
+
+    listen_streams(
+        candles_state.clone(),
+        dom_state.clone(),
+        symbol.slug.to_string(),
+        "5m".to_string(),
+        candles_limit,
+        500,
+    )
+    .await;
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
