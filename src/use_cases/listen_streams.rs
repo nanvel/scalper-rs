@@ -1,5 +1,6 @@
 use crate::binance::streams::{run_candles_stream, run_dom_stream};
 use crate::models::{SharedCandlesState, SharedDomState};
+use tokio::time::{Duration, sleep};
 
 pub async fn listen_streams(
     candles_state: SharedCandlesState,
@@ -23,4 +24,8 @@ pub async fn listen_streams(
             eprintln!("DOM stream error: {}", e)
         }
     });
+
+    loop {
+        sleep(Duration::from_secs(1)).await;
+    }
 }

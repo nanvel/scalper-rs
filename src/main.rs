@@ -9,13 +9,12 @@ use minifb::{Key, Window, WindowOptions};
 use models::{CandlesState, DomState};
 use models::{Config, Layout, Scale};
 use raqote::DrawTarget;
-use std::env;
 use std::sync::{Arc, RwLock};
-use tokio::time::{Duration, sleep};
+use std::{env, thread};
+use tokio::runtime;
 use use_cases::listen_streams::listen_streams;
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -24,12 +23,19 @@ async fn main() {
         std::process::exit(1);
     }
 
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .expect("failed to build tokio runtime");
+
     let symbol_slug = &args[1];
-    let symbol = load_symbol(&symbol_slug).await.unwrap_or_else(|err| {
-        eprintln!("Error loading symbol {}: {}", symbol_slug, err);
-        std::process::exit(1);
-    });
-    let mut tick_size = symbol.tick_size;
+    let symbol = rt
+        .block_on(load_symbol(&symbol_slug))
+        .unwrap_or_else(|err| {
+            eprintln!("Error loading symbol {}: {}", symbol_slug, err);
+            std::process::exit(1);
+        });
 
     let config = Config::default();
 
@@ -51,15 +57,25 @@ async fn main() {
     let candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let dom_state = Arc::new(RwLock::new(DomState::new()));
 
-    listen_streams(
-        candles_state.clone(),
-        dom_state.clone(),
-        symbol.slug.to_string(),
-        "5m".to_string(),
-        candles_limit,
-        500,
-    )
-    .await;
+    let candles_state_clone = candles_state.clone();
+    let dom_state_clone = dom_state.clone();
+    let symbol_slug_clone = symbol.slug.clone();
+    thread::spawn(move || {
+        let rt = runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .expect("failed to build tokio runtime for streams");
+
+        rt.block_on(listen_streams(
+            candles_state_clone,
+            dom_state_clone,
+            symbol_slug_clone.to_string(),
+            "5m".to_string(),
+            candles_limit,
+            500,
+        ));
+    });
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
@@ -67,6 +83,8 @@ async fn main() {
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
     let mut dom_renderer = DomRenderer::new(layout.dom_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
+
+    window.set_target_fps(2);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let (new_width, new_height) = window.get_size() {
@@ -91,6 +109,5 @@ async fn main() {
         window
             .update_with_buffer(&pixels_buffer, window_width, window_height)
             .unwrap();
-        sleep(Duration::from_millis(100)).await;
     }
 }
