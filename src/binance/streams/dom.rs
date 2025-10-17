@@ -4,11 +4,10 @@ use reqwest;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::str::FromStr;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-pub type DomStore = Arc<RwLock<DomState>>;
+pub type SharedDomState = Arc<RwLock<DomState>>;
 
 #[derive(Debug, Deserialize)]
 struct DepthSnapshot {
@@ -30,7 +29,7 @@ struct DepthUpdateEvent {
     event_time: u64,
 }
 
-pub async fn start_dom_stream(symbol: String, limit: usize) -> DomStore {
+pub async fn start_dom_stream(symbol: String, limit: usize) -> SharedDomState {
     let dom_store = Arc::new(RwLock::new(DomState::new()));
     let dom_store_clone = dom_store.clone();
 
@@ -46,7 +45,7 @@ pub async fn start_dom_stream(symbol: String, limit: usize) -> DomStore {
 async fn run_dom_stream(
     symbol: String,
     limit: usize,
-    dom_store: DomStore,
+    shared_dom_state: SharedDomState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Listen on the WebSocket
     let ws_url = format!(
@@ -84,16 +83,15 @@ async fn run_dom_stream(
         .collect();
 
     {
-        let mut buffer = dom_store.write().await;
+        let mut buffer = shared_dom_state.write().unwrap();
         buffer.init_snapshot(bids, asks);
-        buffer.online = true;
     }
 
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
                 if let Ok(event) = serde_json::from_str::<DepthUpdateEvent>(&text) {
-                    let mut buffer = dom_store.write().await;
+                    let mut buffer = shared_dom_state.write().unwrap();
                     for b in event.bids.iter() {
                         if let (Ok(price), Ok(qty)) =
                             (Decimal::from_str(&b[0]), Decimal::from_str(&b[1]))
@@ -113,13 +111,13 @@ async fn run_dom_stream(
                 }
             }
             Ok(Message::Close(_)) => {
-                let mut buffer = dom_store.write().await;
+                let mut buffer = shared_dom_state.write().unwrap();
                 buffer.online = false;
                 println!("WebSocket closed");
                 break;
             }
             Err(e) => {
-                let mut buffer = dom_store.write().await;
+                let mut buffer = shared_dom_state.write().unwrap();
                 buffer.online = false;
                 eprintln!("Error: {}", e);
                 break;

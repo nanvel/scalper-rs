@@ -4,11 +4,10 @@ use reqwest;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::str::FromStr;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-pub type CandlesStore = Arc<RwLock<CandlesState>>;
+pub type SharedCandlesState = Arc<RwLock<CandlesState>>;
 
 #[derive(Debug, Deserialize)]
 struct KlineEvent {
@@ -34,7 +33,11 @@ struct KlineData {
     volume: String,
 }
 
-pub async fn start_candles_stream(symbol: String, interval: String, limit: usize) -> CandlesStore {
+pub async fn start_candles_stream(
+    symbol: String,
+    interval: String,
+    limit: usize,
+) -> SharedCandlesState {
     let candles_store = Arc::new(RwLock::new(CandlesState::new(limit)));
     let candles_store_clone = candles_store.clone();
 
@@ -51,7 +54,7 @@ async fn run_stream(
     symbol: String,
     interval: String,
     limit: usize,
-    candles_store: CandlesStore,
+    shared_candles_state: SharedCandlesState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Fetch initial candles
     let url = format!(
@@ -74,7 +77,7 @@ async fn run_stream(
         .collect();
 
     {
-        let mut buffer = candles_store.write().await;
+        let mut buffer = shared_candles_state.write().unwrap();
         for candle in initial_candles {
             buffer.push(candle);
         }
@@ -102,20 +105,20 @@ async fn run_stream(
                         volume: Decimal::from_str(&event.kline.volume).unwrap_or(Decimal::ZERO),
                     };
 
-                    let mut buffer = candles_store.write().await;
+                    let mut buffer = shared_candles_state.write().unwrap();
                     buffer.push(candle);
                     buffer.updated = event.event_time.into();
                     buffer.online = true;
                 }
             }
             Ok(Message::Close(_)) => {
-                let mut buffer = candles_store.write().await;
+                let mut buffer = shared_candles_state.write().unwrap();
                 buffer.online = false;
                 println!("WebSocket closed");
                 break;
             }
             Err(e) => {
-                let mut buffer = candles_store.write().await;
+                let mut buffer = shared_candles_state.write().unwrap();
                 buffer.online = false;
                 eprintln!("Error: {}", e);
                 break;

@@ -2,7 +2,7 @@ use crate::models::{Area, Config, DomState, Scale};
 use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Source, StrokeStyle};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
-use tokio::sync::RwLockReadGuard;
+use std::sync::RwLockReadGuard;
 
 pub struct DomRenderer {
     area: Area,

@@ -6,7 +6,7 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use std::cmp;
 use std::ops::Mul;
-use tokio::sync::RwLockReadGuard;
+use std::sync::RwLockReadGuard;
 
 pub struct CandlesRenderer {
     area: Area,
