@@ -1,15 +1,15 @@
-pub mod candles;
+mod candles;
 mod color;
-pub mod config;
+mod config;
 mod dom;
-pub mod layout;
-pub mod scale;
+mod layout;
+mod scale;
 mod symbol;
-pub mod timestamp;
+mod timestamp;
 
-pub use candles::{Candle, CandlesState};
+pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use config::Config;
-pub use dom::DomState;
+pub use dom::{DomState, SharedDomState};
 pub use layout::{Area, Layout};
 pub use scale::Scale;
 pub use symbol::Symbol;

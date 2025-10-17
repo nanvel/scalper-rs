@@ -1,4 +1,4 @@
-use crate::models::{Candle, CandlesState, Timestamp};
+use crate::models::{Candle, CandlesState, SharedCandlesState, Timestamp};
 use futures_util::stream::StreamExt;
 use reqwest;
 use rust_decimal::Decimal;
@@ -6,8 +6,6 @@ use serde::Deserialize;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
-
-pub type SharedCandlesState = Arc<RwLock<CandlesState>>;
 
 #[derive(Debug, Deserialize)]
 struct KlineEvent {

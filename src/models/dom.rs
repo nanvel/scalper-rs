@@ -2,6 +2,7 @@ use super::timestamp::Timestamp;
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::collections::BTreeMap;
+use std::sync::{Arc, RwLock};
 
 pub struct DomState {
     pub bids: BTreeMap<Decimal, Decimal>,
@@ -98,3 +99,5 @@ impl DomState {
             .collect()
     }
 }
+
+pub type SharedDomState = Arc<RwLock<DomState>>;

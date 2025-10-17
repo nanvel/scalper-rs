@@ -1,6 +1,7 @@
 use super::Timestamp;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Candle {
@@ -141,3 +142,5 @@ mod tests {
         assert_eq!(last_candle.open_time, candle5.open_time);
     }
 }
+
+pub type SharedCandlesState = Arc<RwLock<CandlesState>>;

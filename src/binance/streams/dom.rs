@@ -1,4 +1,4 @@
-use crate::models::DomState;
+use crate::models::{DomState, SharedDomState};
 use futures_util::stream::StreamExt;
 use reqwest;
 use rust_decimal::Decimal;
@@ -6,8 +6,6 @@ use serde::Deserialize;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
-
-pub type SharedDomState = Arc<RwLock<DomState>>;
 
 #[derive(Debug, Deserialize)]
 struct DepthSnapshot {
