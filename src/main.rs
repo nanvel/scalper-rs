@@ -9,8 +9,8 @@ use minifb::{Key, Window, WindowOptions};
 use models::{CandlesState, DomState};
 use models::{Config, Layout, Scale};
 use raqote::DrawTarget;
+use std::env;
 use std::sync::{Arc, RwLock};
-use std::{env, thread};
 use tokio::runtime;
 use use_cases::listen_streams::listen_streams;
 
@@ -54,28 +54,17 @@ fn main() {
     .unwrap();
 
     let candles_limit = 100;
-    let candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
-    let dom_state = Arc::new(RwLock::new(DomState::new()));
+    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
+    let shared_dom_state = Arc::new(RwLock::new(DomState::new()));
 
-    let candles_state_clone = candles_state.clone();
-    let dom_state_clone = dom_state.clone();
-    let symbol_slug_clone = symbol.slug.clone();
-    thread::spawn(move || {
-        let rt = runtime::Builder::new_multi_thread()
-            .worker_threads(1)
-            .enable_all()
-            .build()
-            .expect("failed to build tokio runtime for streams");
-
-        rt.block_on(listen_streams(
-            candles_state_clone,
-            dom_state_clone,
-            symbol_slug_clone.to_string(),
-            "5m".to_string(),
-            candles_limit,
-            500,
-        ));
-    });
+    listen_streams(
+        shared_candles_state.clone(),
+        shared_dom_state.clone(),
+        symbol.slug.to_string(),
+        "5m".to_string(),
+        candles_limit,
+        500,
+    );
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
@@ -84,7 +73,7 @@ fn main() {
     let mut dom_renderer = DomRenderer::new(layout.dom_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
-    window.set_target_fps(2);
+    window.set_target_fps(60);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let (new_width, new_height) = window.get_size() {
@@ -101,8 +90,13 @@ fn main() {
             }
         }
 
-        candles_renderer.render(candles_state.read().unwrap(), &mut dt, &config, &mut scale);
-        dom_renderer.render(dom_state.read().unwrap(), &mut dt, &config, &scale);
+        candles_renderer.render(
+            shared_candles_state.read().unwrap(),
+            &mut dt,
+            &config,
+            &mut scale,
+        );
+        dom_renderer.render(shared_dom_state.read().unwrap(), &mut dt, &config, &scale);
         status_renderer.render(&symbol.slug, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
