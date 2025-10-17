@@ -1,19 +1,49 @@
-mod data;
+mod binance;
 mod graphics;
-mod streams;
+mod models;
+mod use_cases;
 
-use graphics::CandlesRenderer;
+use binance::api::load_symbol;
+use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
-use streams::start_candles_stream;
-use tokio::time::{Duration, sleep};
+use models::{CandlesState, DomState};
+use models::{Config, Layout, Scale};
+use raqote::DrawTarget;
+use std::env;
+use std::sync::{Arc, RwLock};
+use tokio::runtime;
+use use_cases::listen_streams::listen_streams;
 
-#[tokio::main]
-async fn main() {
-    let window_width = 800;
-    let window_height = 600;
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        eprintln!("Error: Symbol argument is required");
+        eprintln!("Usage: {} <SYMBOL>", args[0]);
+        std::process::exit(1);
+    }
+
+    let rt = runtime::Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .expect("failed to build tokio runtime");
+
+    let symbol_slug = &args[1];
+    let symbol = rt
+        .block_on(load_symbol(&symbol_slug))
+        .unwrap_or_else(|err| {
+            eprintln!("Error loading symbol {}: {}", symbol_slug, err);
+            std::process::exit(1);
+        });
+
+    let config = Config::default();
+
+    let mut window_width = 800;
+    let mut window_height = 600;
 
     let mut window = Window::new(
-        "Scalper",
+        &format!("Scalper - {}", symbol.slug),
         window_width,
         window_height,
         WindowOptions {
@@ -23,22 +53,55 @@ async fn main() {
     )
     .unwrap();
 
-    let candles_store = start_candles_stream("MYROUSDT".to_string(), "5m".to_string(), 100).await;
-    let renderer = CandlesRenderer::new(window_width as i32, window_height as i32);
+    let candles_limit = 100;
+    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
+    let shared_dom_state = Arc::new(RwLock::new(DomState::new()));
+
+    listen_streams(
+        shared_candles_state.clone(),
+        shared_dom_state.clone(),
+        symbol.slug.to_string(),
+        "5m".to_string(),
+        candles_limit,
+        500,
+    );
+
+    let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
+    let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
+    let mut scale = Scale::default();
+    let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
+    let mut dom_renderer = DomRenderer::new(layout.dom_area);
+    let mut status_renderer = StatusRenderer::new(layout.status_area);
+
+    window.set_target_fps(60);
 
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        // if let (new_width, new_height) = window.get_size() {
-        //     if new_width != window_width || new_height != window_height {
-        //         window_width = new_width;
-        //         window_height = new_height;
-        //     }
-        // }
+        if let (new_width, new_height) = window.get_size() {
+            if new_width != window_width || new_height != window_height {
+                window_width = new_width;
+                window_height = new_height;
 
-        let dt = renderer.render(&candles_store.read().await.to_vec());
-        let buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
+                dt = DrawTarget::new(window_width as i32, window_height as i32);
+                layout = Layout::new(window_width as i32, window_height as i32, &config);
+                scale = Scale::default();
+                candles_renderer = CandlesRenderer::new(layout.candles_area);
+                dom_renderer = DomRenderer::new(layout.dom_area);
+                status_renderer = StatusRenderer::new(layout.status_area);
+            }
+        }
+
+        candles_renderer.render(
+            shared_candles_state.read().unwrap(),
+            &mut dt,
+            &config,
+            &mut scale,
+        );
+        dom_renderer.render(shared_dom_state.read().unwrap(), &mut dt, &config, &scale);
+        status_renderer.render(&symbol.slug, &mut dt, &config);
+
+        let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
-            .update_with_buffer(&buffer, window_width, window_height)
+            .update_with_buffer(&pixels_buffer, window_width, window_height)
             .unwrap();
-        sleep(Duration::from_millis(100)).await;
     }
 }
