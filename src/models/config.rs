@@ -1,4 +1,5 @@
 use super::color::Color;
+use rust_decimal::{Decimal, prelude::FromStr};
 
 pub struct Config {
     pub online_color: Color,
@@ -14,6 +15,9 @@ pub struct Config {
     pub status_height: i32,
     pub row_height: i32,
     pub border_width: i32,
+
+    pub scales: Vec<Decimal>,
+    pub initial_scale: Decimal,
 }
 
 impl Default for Config {
@@ -31,6 +35,26 @@ impl Default for Config {
             status_height: 20,
             row_height: 10,
             border_width: 1,
+            scales: vec![
+                Decimal::from_str("0.01").unwrap(),
+                Decimal::from_str("0.02").unwrap(),
+                Decimal::from_str("0.05").unwrap(),
+                Decimal::from_str("0.1").unwrap(),
+                Decimal::from_str("0.2").unwrap(),
+                Decimal::from_str("0.5").unwrap(),
+                Decimal::from_str("1").unwrap(),
+                Decimal::from_str("3").unwrap(),
+                Decimal::from_str("5").unwrap(),
+                Decimal::from_str("7").unwrap(),
+                Decimal::from_str("9").unwrap(),
+                Decimal::from_str("11").unwrap(),
+                Decimal::from_str("13").unwrap(),
+                Decimal::from_str("15").unwrap(),
+                Decimal::from_str("17").unwrap(),
+                Decimal::from_str("19").unwrap(),
+                Decimal::from_str("21").unwrap(),
+            ],
+            initial_scale: Decimal::from_str("1").unwrap(),
         }
     }
 }
