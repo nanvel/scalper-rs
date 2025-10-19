@@ -53,11 +53,8 @@ impl CandlesRenderer {
             }
         }
 
-        let candle_width = cmp::min(
-            (self.area.width - 2 * self.padding) / (candles.len() as i32),
-            10,
-        );
-        let body_width = (candle_width as f32 * 0.7).max(1.0) as i32;
+        let candle_width = 15;
+        let body_width = 11;
         let central_point = self.area.height / 2;
 
         let price_to_y = |price: Decimal| -> i32 {
