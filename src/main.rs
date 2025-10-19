@@ -4,7 +4,7 @@ mod models;
 mod use_cases;
 
 use binance::api::load_symbol;
-use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
+use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
 use models::{CandlesState, Config, DomState, Layout, OrderFlowState, PxPerTick};
 use raqote::DrawTarget;
@@ -72,6 +72,7 @@ fn main() {
     let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
     let mut dom_renderer = DomRenderer::new(layout.dom_area);
+    let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
     window.set_target_fps(60);
@@ -104,6 +105,7 @@ fn main() {
                 layout = Layout::new(window_width as i32, window_height as i32, &config);
                 candles_renderer = CandlesRenderer::new(layout.candles_area);
                 dom_renderer = DomRenderer::new(layout.dom_area);
+                order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
                 status_renderer = StatusRenderer::new(layout.status_area);
             }
         }
@@ -139,6 +141,14 @@ fn main() {
             );
             dom_renderer.render(
                 shared_dom_state.read().unwrap(),
+                &mut dt,
+                &config,
+                symbol.tick_size,
+                center_price,
+                px_per_tick.get(),
+            );
+            order_flow_renderer.render(
+                shared_order_flow_state.read().unwrap(),
                 &mut dt,
                 &config,
                 symbol.tick_size,

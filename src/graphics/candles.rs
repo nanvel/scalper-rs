@@ -157,25 +157,6 @@ impl CandlesRenderer {
             },
             &DrawOptions::new(),
         );
-
-        // border
-        let mut pb = PathBuilder::new();
-        pb.move_to(0.0, self.area.height as f32);
-        pb.line_to(self.area.width as f32, self.area.height as f32);
-        pb.line_to(self.area.width as f32, 0.0);
-        let path = pb.finish();
-
-        dt.stroke(
-            &path,
-            &Source::Solid(config.border_color.into()),
-            &StrokeStyle {
-                width: 1.0,
-                cap: LineCap::Round,
-                join: LineJoin::Round,
-                ..Default::default()
-            },
-            &DrawOptions::new(),
-        );
     }
 }
 

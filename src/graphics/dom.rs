@@ -150,7 +150,10 @@ impl DomRenderer {
 
         // border
         let mut pb = PathBuilder::new();
-        pb.move_to(self.area.left as f32, self.area.height as f32);
+        pb.move_to(
+            (self.area.left + self.area.width) as f32,
+            self.area.top as f32,
+        );
         pb.line_to(
             (self.area.left + self.area.width) as f32,
             self.area.height as f32,

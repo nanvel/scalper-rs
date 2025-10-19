@@ -26,7 +26,7 @@ impl Layout {
         let candles_area = Area {
             left: 0,
             top: 0,
-            width: window_width - config.dom_width,
+            width: window_width - config.dom_width - config.order_flow_width,
             height: window_height - config.status_height,
         };
 
