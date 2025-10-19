@@ -3,7 +3,8 @@ mod color;
 mod config;
 mod dom;
 mod layout;
-mod scale;
+mod order_flow;
+mod px_per_tick;
 mod symbol;
 mod timestamp;
 
@@ -11,6 +12,7 @@ pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use config::Config;
 pub use dom::{DomState, SharedDomState};
 pub use layout::{Area, Layout};
-pub use scale::Scale;
+pub use order_flow::{OrderFlowState, SharedOrderFlowState};
+pub use px_per_tick::PxPerTick;
 pub use symbol::Symbol;
 pub use timestamp::Timestamp;

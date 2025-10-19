@@ -1,4 +1,4 @@
-use crate::models::{Area, CandlesState, Config, Scale};
+use crate::models::{Area, CandlesState, Config};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
@@ -23,7 +23,9 @@ impl CandlesRenderer {
         candles_state: RwLockReadGuard<CandlesState>,
         dt: &mut DrawTarget,
         config: &Config,
-        scale: &mut Scale,
+        tick_size: Decimal,
+        center: Decimal,
+        px_per_tick: Decimal,
     ) {
         dt.fill_rect(
             self.area.left as f32,
@@ -51,37 +53,22 @@ impl CandlesRenderer {
             }
         }
 
-        let price_range = max_price - min_price;
         let candle_width = cmp::min(
             (self.area.width - 2 * self.padding) / (candles.len() as i32),
             10,
         );
         let body_width = (candle_width as f32 * 0.7).max(1.0) as i32;
-
-        let new_central_price = closest_significant(current_price, min_price, max_price);
-        if scale.central_price.is_zero()
-            || (scale.central_price - new_central_price).abs() > price_range / Decimal::from(4)
-        {
-            let price_to_points = price_range / Decimal::from(self.area.height - self.padding * 2);
-            let price_to_points = closest_significant(
-                price_to_points,
-                price_to_points.mul(Decimal::from_f64(0.3).unwrap()),
-                price_to_points.mul(Decimal::from(3)),
-            );
-            scale.price_to_points = price_to_points;
-            scale.central_price = new_central_price;
-            scale.central_point = (self.area.height / 2) + self.area.top;
-        }
+        let central_point = self.area.height / 2;
 
         let price_to_y = |price: Decimal| -> i32 {
-            if price > scale.central_price {
-                return scale.central_point
-                    - ((price - scale.central_price) / scale.price_to_points)
+            if price > center {
+                return central_point
+                    - ((price - center) / tick_size * px_per_tick)
                         .to_i32()
                         .unwrap_or(0);
             } else {
-                return scale.central_point
-                    + ((scale.central_price - price) / scale.price_to_points)
+                return central_point
+                    + ((center - price) / tick_size * px_per_tick)
                         .to_i32()
                         .unwrap_or(0);
             }
@@ -162,25 +149,6 @@ impl CandlesRenderer {
         dt.stroke(
             &path,
             &Source::Solid(config.current_price_color.into()),
-            &StrokeStyle {
-                width: 1.0,
-                cap: LineCap::Round,
-                join: LineJoin::Round,
-                ..Default::default()
-            },
-            &DrawOptions::new(),
-        );
-
-        // border
-        let mut pb = PathBuilder::new();
-        pb.move_to(0.0, self.area.height as f32);
-        pb.line_to(self.area.width as f32, self.area.height as f32);
-        pb.line_to(self.area.width as f32, 0.0);
-        let path = pb.finish();
-
-        dt.stroke(
-            &path,
-            &Source::Solid(config.border_color.into()),
             &StrokeStyle {
                 width: 1.0,
                 cap: LineCap::Round,

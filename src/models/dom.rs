@@ -1,10 +1,10 @@
 use super::timestamp::Timestamp;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
 pub struct DomState {
+    tick_size: Decimal,
     pub bids: BTreeMap<Decimal, Decimal>,
     pub asks: BTreeMap<Decimal, Decimal>,
     pub updated: Timestamp,
@@ -12,8 +12,9 @@ pub struct DomState {
 }
 
 impl DomState {
-    pub fn new() -> Self {
+    pub fn new(tick_size: Decimal) -> Self {
         Self {
+            tick_size,
             bids: BTreeMap::new(),
             asks: BTreeMap::new(),
             updated: Timestamp::now(),
@@ -42,61 +43,10 @@ impl DomState {
         }
     }
 
-    pub fn get_asks(&self, n: u32, tick_size: Decimal) -> Vec<(Decimal, Decimal)> {
-        let min_price = self.asks.keys().next().cloned().unwrap_or(Decimal::ZERO);
-        let min_price = (min_price / tick_size).floor() * tick_size;
-        let mut buckets = vec![Decimal::ZERO; n as usize];
-
-        for (&price, &qty) in &self.asks {
-            let index = ((price - min_price) / tick_size)
-                .to_u32()
-                .unwrap_or(u32::MAX);
-            if index < n {
-                buckets[index as usize] += qty;
-            } else {
-                break;
-            }
-        }
-
-        (0..n)
-            .map(|i| {
-                (
-                    min_price + tick_size * Decimal::from(i),
-                    buckets[i as usize],
-                )
-            })
-            .collect()
-    }
-
-    pub fn get_bids(&self, n: u32, tick_size: Decimal) -> Vec<(Decimal, Decimal)> {
-        let max_price = self
-            .bids
-            .keys()
-            .next_back()
-            .cloned()
-            .unwrap_or(Decimal::ZERO);
-        let max_price = (max_price / tick_size).floor() * tick_size;
-        let mut buckets = vec![Decimal::ZERO; n as usize];
-
-        for (&price, &qty) in self.bids.iter().rev() {
-            let index = ((max_price - price) / tick_size)
-                .to_u32()
-                .unwrap_or(u32::MAX);
-            if index < n {
-                buckets[index as usize] += qty;
-            } else {
-                break;
-            }
-        }
-
-        (0..n)
-            .map(|i| {
-                (
-                    max_price - tick_size * Decimal::from(i),
-                    buckets[i as usize],
-                )
-            })
-            .collect()
+    pub fn center(&self) -> Option<Decimal> {
+        let best_bid = self.bids.keys().next_back()?;
+        let best_ask = self.asks.keys().next()?;
+        Some(((*best_bid + *best_ask) / Decimal::from(2) / self.tick_size).floor() * self.tick_size)
     }
 }
 

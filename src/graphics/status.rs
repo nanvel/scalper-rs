@@ -1,6 +1,6 @@
 use crate::models::{Area, Config};
 use font_kit::font::Font;
-use raqote::{DrawOptions, DrawTarget, Point, Source};
+use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, Source, StrokeStyle};
 use std::fs;
 
 pub struct StatusRenderer {
@@ -36,6 +36,27 @@ impl StatusRenderer {
                 (self.area.top + self.area.height - self.padding) as f32,
             ),
             &Source::Solid(config.text_color.into()),
+            &DrawOptions::new(),
+        );
+
+        // border
+        let mut pb = PathBuilder::new();
+        pb.move_to(self.area.left as f32, self.area.top as f32);
+        pb.line_to(
+            (self.area.left + self.area.width) as f32,
+            self.area.top as f32,
+        );
+        let path = pb.finish();
+
+        dt.stroke(
+            &path,
+            &Source::Solid(config.border_color.into()),
+            &StrokeStyle {
+                width: 1.0,
+                cap: LineCap::Round,
+                join: LineJoin::Round,
+                ..Default::default()
+            },
             &DrawOptions::new(),
         );
     }
