@@ -80,14 +80,34 @@ impl DomRenderer {
             let width = (val / max_val * max_width).to_f32().unwrap_or(0.0);
             let y = i as f32 + self.area.top as f32;
 
-            dt.fill_rect(
-                left,
-                y,
-                width,
-                1.0,
-                &Source::Solid(config.bid_color.into()),
-                &DrawOptions::new(),
-            );
+            if px_per_tick == Decimal::from(3) {
+                dt.fill_rect(
+                    left,
+                    y - 1.0,
+                    width,
+                    3.0,
+                    &Source::Solid(config.bid_color.into()),
+                    &DrawOptions::new(),
+                );
+            } else if px_per_tick >= Decimal::from(5) {
+                dt.fill_rect(
+                    left,
+                    y - (px_per_tick.to_f32().unwrap() / 2.0).floor(),
+                    width,
+                    px_per_tick.to_f32().unwrap() - 2.0,
+                    &Source::Solid(config.bid_color.into()),
+                    &DrawOptions::new(),
+                );
+            } else {
+                dt.fill_rect(
+                    left,
+                    y,
+                    width,
+                    1.0,
+                    &Source::Solid(config.bid_color.into()),
+                    &DrawOptions::new(),
+                );
+            }
         }
 
         for (i, val) in ask_buckets.iter().enumerate() {
@@ -98,14 +118,34 @@ impl DomRenderer {
             let width = (val / max_val * max_width).to_f32().unwrap_or(0.0);
             let y = i as f32 + self.area.top as f32;
 
-            dt.fill_rect(
-                left,
-                y,
-                width,
-                1.0,
-                &Source::Solid(config.ask_color.into()),
-                &DrawOptions::new(),
-            );
+            if px_per_tick == Decimal::from(3) {
+                dt.fill_rect(
+                    left,
+                    y - 1.0,
+                    width,
+                    3.0,
+                    &Source::Solid(config.ask_color.into()),
+                    &DrawOptions::new(),
+                );
+            } else if px_per_tick >= Decimal::from(5) {
+                dt.fill_rect(
+                    left,
+                    y - (px_per_tick.to_f32().unwrap() / 2.0).floor(),
+                    width,
+                    px_per_tick.to_f32().unwrap() - 2.0,
+                    &Source::Solid(config.ask_color.into()),
+                    &DrawOptions::new(),
+                );
+            } else {
+                dt.fill_rect(
+                    left,
+                    y,
+                    width,
+                    1.0,
+                    &Source::Solid(config.ask_color.into()),
+                    &DrawOptions::new(),
+                );
+            }
         }
 
         // border

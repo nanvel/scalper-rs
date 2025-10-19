@@ -77,7 +77,7 @@ fn main() {
 
     let mut center: Option<Decimal> = None;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        let px_per_tick = Decimal::from_str("1").unwrap();
+        let px_per_tick = Decimal::from_str("5").unwrap();
         if let current_center = shared_dom_state.read().unwrap().center() {
             if center.is_some() {
                 if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
