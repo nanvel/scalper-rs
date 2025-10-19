@@ -6,8 +6,7 @@ mod use_cases;
 use binance::api::load_symbol;
 use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
-use models::{CandlesState, DomState};
-use models::{Config, Layout};
+use models::{CandlesState, Config, DomState, Layout, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
@@ -76,12 +75,15 @@ fn main() {
     window.set_target_fps(60);
 
     let mut center: Option<Decimal> = None;
+    let mut px_per_tick = PxPerTick::new(
+        config.px_per_tick_initial,
+        config.px_per_tick_choices.clone(),
+    );
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        let px_per_tick = Decimal::from_str("5").unwrap();
         if let current_center = shared_dom_state.read().unwrap().center() {
             if center.is_some() {
                 if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
-                    * px_per_tick
+                    * px_per_tick.get()
                     >= Decimal::from(window_height / 4)
                 {
                     center = current_center;
@@ -104,6 +106,26 @@ fn main() {
             }
         }
 
+        if let Some((_, scroll_y)) = window.get_scroll_wheel() {
+            if scroll_y > 0.0 {
+                px_per_tick.scale_in()
+            } else if scroll_y < 0.0 {
+                px_per_tick.scale_out()
+            }
+        }
+
+        if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
+        {
+            px_per_tick.scale_in()
+        }
+
+        if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
+        {
+            px_per_tick.scale_out()
+        }
+
         if let Some(center_price) = center {
             candles_renderer.render(
                 shared_candles_state.read().unwrap(),
@@ -111,7 +133,7 @@ fn main() {
                 &config,
                 symbol.tick_size,
                 center_price,
-                px_per_tick,
+                px_per_tick.get(),
             );
             dom_renderer.render(
                 shared_dom_state.read().unwrap(),
@@ -119,7 +141,7 @@ fn main() {
                 &config,
                 symbol.tick_size,
                 center_price,
-                px_per_tick,
+                px_per_tick.get(),
             );
         }
         status_renderer.render(&symbol.slug, &mut dt, &config);
