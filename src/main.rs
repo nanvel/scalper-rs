@@ -53,6 +53,7 @@ fn main() {
     )
     .unwrap();
 
+    let interval = "5m";
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
@@ -63,7 +64,7 @@ fn main() {
         shared_dom_state.clone(),
         shared_order_flow_state.clone(),
         symbol.slug.to_string(),
-        "5m".to_string(),
+        interval.to_string(),
         candles_limit,
         500,
     );
@@ -156,7 +157,7 @@ fn main() {
                 px_per_tick.get(),
             );
         }
-        status_renderer.render(&symbol.slug, &mut dt, &config);
+        status_renderer.render(&symbol.slug, interval, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window

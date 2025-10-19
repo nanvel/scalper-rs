@@ -1,4 +1,4 @@
-use crate::models::{Area, Config, OrderFlowState};
+use crate::models::{Area, Config, OrderFlowState, Timestamp};
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -7,15 +7,20 @@ use std::sync::RwLockReadGuard;
 pub struct OrderFlowRenderer {
     area: Area,
     padding: i32,
+    last_updated: Option<Timestamp>,
 }
 
 impl OrderFlowRenderer {
     pub fn new(area: Area) -> Self {
-        Self { area, padding: 10 }
+        Self {
+            area,
+            padding: 10,
+            last_updated: None,
+        }
     }
 
     pub fn render(
-        &self,
+        &mut self,
         of_state: RwLockReadGuard<OrderFlowState>,
         dt: &mut DrawTarget,
         config: &Config,
@@ -23,6 +28,13 @@ impl OrderFlowRenderer {
         center: Decimal,
         px_per_tick: Decimal,
     ) {
+        if let Some(last_updated) = self.last_updated {
+            if last_updated == of_state.updated {
+                return;
+            }
+        }
+        self.last_updated = Some(of_state.updated);
+
         // background
         dt.fill_rect(
             self.area.left as f32,

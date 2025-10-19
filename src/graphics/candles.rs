@@ -1,25 +1,28 @@
-use crate::models::{Area, CandlesState, Config};
+use crate::models::{Area, CandlesState, Config, Timestamp};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use std::cmp;
-use std::ops::Mul;
 use std::sync::RwLockReadGuard;
 
 pub struct CandlesRenderer {
     area: Area,
     padding: i32,
+    last_updated: Option<Timestamp>,
 }
 
 impl CandlesRenderer {
     pub fn new(area: Area) -> Self {
-        Self { area, padding: 10 }
+        Self {
+            area,
+            padding: 10,
+            last_updated: None,
+        }
     }
 
     pub fn render(
-        &self,
+        &mut self,
         candles_state: RwLockReadGuard<CandlesState>,
         dt: &mut DrawTarget,
         config: &Config,
@@ -27,6 +30,13 @@ impl CandlesRenderer {
         center: Decimal,
         px_per_tick: Decimal,
     ) {
+        if let Some(last_updated) = self.last_updated {
+            if last_updated == candles_state.updated {
+                return;
+            }
+        }
+        self.last_updated = Some(candles_state.updated);
+
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
@@ -53,11 +63,8 @@ impl CandlesRenderer {
             }
         }
 
-        let candle_width = cmp::min(
-            (self.area.width - 2 * self.padding) / (candles.len() as i32),
-            10,
-        );
-        let body_width = (candle_width as f32 * 0.7).max(1.0) as i32;
+        let candle_width = 15;
+        let body_width = 11;
         let central_point = self.area.height / 2;
 
         let price_to_y = |price: Decimal| -> i32 {
@@ -121,21 +128,6 @@ impl CandlesRenderer {
 
             dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
         }
-
-        let dot_color: SolidSource = if candles_state.online {
-            config.online_color.into()
-        } else {
-            config.offline_color.into()
-        };
-
-        let mut pb = PathBuilder::new();
-        let dot_radius = 5.0;
-        let dot_x = self.area.left as f32 + 15.0;
-        let dot_y = (self.area.top + self.area.height) as f32 - 15.0;
-        pb.arc(dot_x, dot_y, dot_radius, 0.0, 2.0 * std::f32::consts::PI);
-        let path = pb.finish();
-
-        dt.fill(&path, &Source::Solid(dot_color), &DrawOptions::new());
 
         // current price line
         let mut pb = PathBuilder::new();

@@ -1,2 +1,4 @@
 pub mod api;
-pub mod streams;
+mod market_stream;
+
+pub use market_stream::start_market_stream;
