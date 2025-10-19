@@ -1,4 +1,4 @@
-use crate::models::{Area, Config, DomState};
+use crate::models::{Area, Config, DomState, Timestamp};
 use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Source, StrokeStyle};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -7,15 +7,20 @@ use std::sync::RwLockReadGuard;
 pub struct DomRenderer {
     area: Area,
     padding: i32,
+    last_updated: Option<Timestamp>,
 }
 
 impl DomRenderer {
     pub fn new(area: Area) -> Self {
-        Self { area, padding: 10 }
+        Self {
+            area,
+            padding: 10,
+            last_updated: None,
+        }
     }
 
     pub fn render(
-        &self,
+        &mut self,
         dom_state: RwLockReadGuard<DomState>,
         dt: &mut DrawTarget,
         config: &Config,
@@ -23,6 +28,13 @@ impl DomRenderer {
         center: Decimal,
         px_per_tick: Decimal,
     ) {
+        if let Some(last_updated) = self.last_updated {
+            if last_updated == dom_state.updated {
+                return;
+            }
+        }
+        self.last_updated = Some(dom_state.updated);
+
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
@@ -147,29 +159,5 @@ impl DomRenderer {
                 );
             }
         }
-
-        // border
-        let mut pb = PathBuilder::new();
-        pb.move_to(
-            (self.area.left + self.area.width) as f32,
-            self.area.top as f32,
-        );
-        pb.line_to(
-            (self.area.left + self.area.width) as f32,
-            self.area.height as f32,
-        );
-        let path = pb.finish();
-
-        dt.stroke(
-            &path,
-            &Source::Solid(config.border_color.into()),
-            &StrokeStyle {
-                width: 1.0,
-                cap: LineCap::Round,
-                join: LineJoin::Round,
-                ..Default::default()
-            },
-            &DrawOptions::new(),
-        );
     }
 }
