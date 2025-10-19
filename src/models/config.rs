@@ -10,14 +10,16 @@ pub struct Config {
     pub text_color: Color,
     pub border_color: Color,
     pub current_price_color: Color,
+    pub bid_color: Color,
+    pub ask_color: Color,
 
     pub dom_width: i32,
     pub status_height: i32,
     pub row_height: i32,
     pub border_width: i32,
 
-    pub scales: Vec<Decimal>,
-    pub initial_scale: Decimal,
+    pub px_per_tick_choices: Vec<Decimal>,
+    pub px_per_tick_initial: Decimal,
 }
 
 impl Default for Config {
@@ -31,11 +33,13 @@ impl Default for Config {
             text_color: Color::BLACK,
             border_color: Color::BLACK,
             current_price_color: Color::GRAY,
+            bid_color: Color::GREEN,
+            ask_color: Color::RED,
             dom_width: 100,
             status_height: 20,
             row_height: 10,
             border_width: 1,
-            scales: vec![
+            px_per_tick_choices: vec![
                 Decimal::from_str("0.01").unwrap(),
                 Decimal::from_str("0.02").unwrap(),
                 Decimal::from_str("0.05").unwrap(),
@@ -54,7 +58,7 @@ impl Default for Config {
                 Decimal::from_str("19").unwrap(),
                 Decimal::from_str("21").unwrap(),
             ],
-            initial_scale: Decimal::from_str("1").unwrap(),
+            px_per_tick_initial: Decimal::from_str("1").unwrap(),
         }
     }
 }

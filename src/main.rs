@@ -75,9 +75,21 @@ fn main() {
 
     window.set_target_fps(60);
 
+    let mut center: Option<Decimal> = None;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        let center = shared_dom_state.read().unwrap().center();
-        let px_per_tick = Decimal::from_str("0.1").unwrap();
+        let px_per_tick = Decimal::from_str("1").unwrap();
+        if let current_center = shared_dom_state.read().unwrap().center() {
+            if center.is_some() {
+                if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
+                    * px_per_tick
+                    >= Decimal::from(window_height / 4)
+                {
+                    center = current_center;
+                }
+            } else {
+                center = current_center;
+            }
+        }
 
         if let (new_width, new_height) = window.get_size() {
             if new_width != window_width || new_height != window_height {
