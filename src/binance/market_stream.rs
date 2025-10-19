@@ -1,10 +1,11 @@
 use crate::models::{Candle, SharedCandlesState, SharedDomState, SharedOrderFlowState};
 use futures_util::stream::StreamExt;
-use reqwest;
+use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
+use tokio_tungstenite::tungstenite::http;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 #[derive(Debug, Deserialize)]
@@ -72,12 +73,15 @@ pub async fn start_market_stream(
     shared_dom_state: SharedDomState,
     shared_order_flow_state: SharedOrderFlowState,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let http_client = Client::builder().user_agent("scalper-rs/0.1").build()?;
+
     // Fetch initial candles
-    let url = format!(
+    let candles_url = format!(
         "https://fapi.binance.com/fapi/v1/klines?symbol={}&interval={}&limit={}",
         symbol, interval, candles_limit
     );
-    let response = reqwest::get(&url).await?.error_for_status()?;
+
+    let response = http_client.get(&candles_url).send().await?;
     let data: Vec<serde_json::Value> = response.json().await?;
 
     let initial_candles: Vec<Candle> = data
@@ -101,21 +105,22 @@ pub async fn start_market_stream(
 
     // Listen on the WebSocket
     let ws_url = format!(
-        "wss://stream.binance.com:9443/stream?streams={}@kline_{}/{}@depth@100ms/{}@aggTrade",
+        "wss://fstream.binance.com/stream?streams={}@kline_{}/{}@depth@100ms/{}@aggTrade",
         symbol.to_lowercase(),
         interval,
         symbol.to_lowercase(),
         symbol.to_lowercase(),
     );
+    dbg!(&ws_url);
     let (ws_stream, _) = connect_async(ws_url).await?;
     let (_write, mut read) = ws_stream.split();
 
     // Fetch initial order book snapshot
-    let url = format!(
+    let dom_url = format!(
         "https://fapi.binance.com/fapi/v1/depth?symbol={}&limit={}",
         symbol, dom_limit
     );
-    let response = reqwest::get(&url).await?;
+    let response = http_client.get(&dom_url).send().await?;
     let snapshot: DepthSnapshot = response.json().await?;
 
     let bids: Vec<(Decimal, Decimal)> = snapshot
@@ -145,50 +150,53 @@ pub async fn start_market_stream(
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
-                if let Ok(event) = serde_json::from_str::<KlineEvent>(&text) {
-                    let candle = Candle {
-                        open_time: event.kline.start_time.into(),
-                        open: Decimal::from_str(&event.kline.open).unwrap_or(Decimal::ZERO),
-                        high: Decimal::from_str(&event.kline.high).unwrap_or(Decimal::ZERO),
-                        low: Decimal::from_str(&event.kline.low).unwrap_or(Decimal::ZERO),
-                        close: Decimal::from_str(&event.kline.close).unwrap_or(Decimal::ZERO),
-                        volume: Decimal::from_str(&event.kline.volume).unwrap_or(Decimal::ZERO),
-                    };
+                if let Some(data) = extract_inner(&text) {
+                    if let Ok(event) = serde_json::from_value::<DepthUpdateEvent>(data.clone()) {
+                        let mut buffer = shared_dom_state.write().unwrap();
+                        for b in event.bids.iter() {
+                            if let (Ok(price), Ok(qty)) =
+                                (Decimal::from_str(&b[0]), Decimal::from_str(&b[1]))
+                            {
+                                buffer.update_bid(price, qty);
+                            }
+                        }
+                        for a in event.asks.iter() {
+                            if let (Ok(price), Ok(qty)) =
+                                (Decimal::from_str(&a[0]), Decimal::from_str(&a[1]))
+                            {
+                                buffer.update_ask(price, qty);
+                            }
+                        }
+                        buffer.updated = event.event_time.into();
+                        buffer.online = true;
+                    } else if let Ok(event) = serde_json::from_value::<AggTradeEvent>(data.clone())
+                    {
+                        if let (Ok(price), Ok(qty)) = (
+                            Decimal::from_str(&event.price),
+                            Decimal::from_str(&event.quantity),
+                        ) {
+                            let mut buffer = shared_order_flow_state.write().unwrap();
+                            // If maker == true, buyer is the market maker -> trade was seller-initiated (sell)
+                            if event.maker {
+                                buffer.sell(price, qty);
+                            } else {
+                                buffer.buy(price, qty);
+                            }
+                            buffer.updated = event.event_time.into();
+                            buffer.online = true;
+                        }
+                    } else if let Ok(event) = serde_json::from_value::<KlineEvent>(data.clone()) {
+                        let candle = Candle {
+                            open_time: event.kline.start_time.into(),
+                            open: Decimal::from_str(&event.kline.open).unwrap_or(Decimal::ZERO),
+                            high: Decimal::from_str(&event.kline.high).unwrap_or(Decimal::ZERO),
+                            low: Decimal::from_str(&event.kline.low).unwrap_or(Decimal::ZERO),
+                            close: Decimal::from_str(&event.kline.close).unwrap_or(Decimal::ZERO),
+                            volume: Decimal::from_str(&event.kline.volume).unwrap_or(Decimal::ZERO),
+                        };
 
-                    let mut buffer = shared_candles_state.write().unwrap();
-                    buffer.push(candle);
-                    buffer.updated = event.event_time.into();
-                    buffer.online = true;
-                } else if let Ok(event) = serde_json::from_str::<DepthUpdateEvent>(&text) {
-                    let mut buffer = shared_dom_state.write().unwrap();
-                    for b in event.bids.iter() {
-                        if let (Ok(price), Ok(qty)) =
-                            (Decimal::from_str(&b[0]), Decimal::from_str(&b[1]))
-                        {
-                            buffer.update_bid(price, qty);
-                        }
-                    }
-                    for a in event.asks.iter() {
-                        if let (Ok(price), Ok(qty)) =
-                            (Decimal::from_str(&a[0]), Decimal::from_str(&a[1]))
-                        {
-                            buffer.update_ask(price, qty);
-                        }
-                    }
-                    buffer.updated = event.event_time.into();
-                    buffer.online = true;
-                } else if let Ok(event) = serde_json::from_str::<AggTradeEvent>(&text) {
-                    if let (Ok(price), Ok(qty)) = (
-                        Decimal::from_str(&event.price),
-                        Decimal::from_str(&event.quantity),
-                    ) {
-                        let mut buffer = shared_order_flow_state.write().unwrap();
-                        // If maker == true, buyer is the market maker -> trade was seller-initiated (sell)
-                        if event.maker {
-                            buffer.sell(price, qty);
-                        } else {
-                            buffer.buy(price, qty);
-                        }
+                        let mut buffer = shared_candles_state.write().unwrap();
+                        buffer.push(candle);
                         buffer.updated = event.event_time.into();
                         buffer.online = true;
                     }
@@ -211,4 +219,17 @@ pub async fn start_market_stream(
     }
 
     Ok(())
+}
+
+fn extract_inner(text: &str) -> Option<serde_json::Value> {
+    match serde_json::from_str::<serde_json::Value>(text) {
+        Ok(v) => {
+            if v.get("stream").is_some() {
+                v.get("data").cloned()
+            } else {
+                Some(v)
+            }
+        }
+        Err(_) => None,
+    }
 }

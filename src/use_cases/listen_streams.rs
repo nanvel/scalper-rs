@@ -33,13 +33,13 @@ pub fn listen_streams(
                 )
                 .await
                 {
-                    eprintln!("Market stream error: {}", e)
-                }
-
-                loop {
-                    sleep(Duration::from_secs(1)).await;
+                    eprintln!("Market stream error: {:?}", e)
                 }
             });
+
+            loop {
+                sleep(Duration::from_secs(1)).await;
+            }
         });
     });
 }
