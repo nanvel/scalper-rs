@@ -14,6 +14,7 @@ pub struct Config {
     pub ask_color: Color,
 
     pub dom_width: i32,
+    pub order_flow_width: i32,
     pub status_height: i32,
     pub row_height: i32,
     pub border_width: i32,
@@ -36,6 +37,7 @@ impl Default for Config {
             bid_color: Color::GREEN,
             ask_color: Color::RED,
             dom_width: 100,
+            order_flow_width: 100,
             status_height: 20,
             row_height: 10,
             border_width: 1,

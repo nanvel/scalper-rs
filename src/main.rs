@@ -6,7 +6,7 @@ mod use_cases;
 use binance::api::load_symbol;
 use graphics::{CandlesRenderer, DomRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
-use models::{CandlesState, Config, DomState, Layout, PxPerTick};
+use models::{CandlesState, Config, DomState, Layout, OrderFlowState, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
@@ -56,10 +56,12 @@ fn main() {
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
+    let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
 
     listen_streams(
         shared_candles_state.clone(),
         shared_dom_state.clone(),
+        shared_order_flow_state.clone(),
         symbol.slug.to_string(),
         "5m".to_string(),
         candles_limit,

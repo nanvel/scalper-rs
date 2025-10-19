@@ -10,6 +10,7 @@ pub struct Area {
 pub struct Layout {
     pub candles_area: Area,
     pub dom_area: Area,
+    pub order_flow_area: Area,
     pub status_area: Area,
 }
 
@@ -22,13 +23,6 @@ impl Layout {
             height: config.status_height,
         };
 
-        let dom_area = Area {
-            left: window_width - config.dom_width,
-            top: 0,
-            width: config.dom_width,
-            height: window_height - config.status_height,
-        };
-
         let candles_area = Area {
             left: 0,
             top: 0,
@@ -36,9 +30,24 @@ impl Layout {
             height: window_height - config.status_height,
         };
 
+        let dom_area = Area {
+            left: window_width - config.order_flow_width - config.dom_width,
+            top: 0,
+            width: config.dom_width,
+            height: window_height - config.status_height,
+        };
+
+        let order_flow_area = Area {
+            left: window_width - config.order_flow_width,
+            top: 0,
+            width: config.order_flow_width,
+            height: window_height - config.status_height,
+        };
+
         Self {
             candles_area,
             dom_area,
+            order_flow_area,
             status_area,
         }
     }
