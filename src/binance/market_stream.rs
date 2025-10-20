@@ -1,4 +1,4 @@
-use crate::models::{Candle, SharedCandlesState, SharedDomState, SharedOrderFlowState};
+use crate::models::{Candle, Interval, SharedCandlesState, SharedDomState, SharedOrderFlowState};
 use futures_util::stream::StreamExt;
 use reqwest::Client;
 use rust_decimal::Decimal;
@@ -66,7 +66,7 @@ struct AggTradeEvent {
 
 pub async fn start_market_stream(
     symbol: String,
-    interval: String,
+    interval: Interval,
     candles_limit: usize,
     dom_limit: usize,
     shared_candles_state: SharedCandlesState,
@@ -78,7 +78,9 @@ pub async fn start_market_stream(
     // Fetch initial candles
     let candles_url = format!(
         "https://fapi.binance.com/fapi/v1/klines?symbol={}&interval={}&limit={}",
-        symbol, interval, candles_limit
+        symbol,
+        interval.slug(),
+        candles_limit
     );
 
     let response = http_client.get(&candles_url).send().await?;
@@ -107,7 +109,7 @@ pub async fn start_market_stream(
     let ws_url = format!(
         "wss://fstream.binance.com/stream?streams={}@kline_{}/{}@depth@100ms/{}@aggTrade",
         symbol.to_lowercase(),
-        interval,
+        interval.slug(),
         symbol.to_lowercase(),
         symbol.to_lowercase(),
     );

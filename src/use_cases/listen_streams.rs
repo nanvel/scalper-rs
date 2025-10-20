@@ -1,5 +1,5 @@
 use crate::binance::start_market_stream;
-use crate::models::{SharedCandlesState, SharedDomState, SharedOrderFlowState};
+use crate::models::{Interval, SharedCandlesState, SharedDomState, SharedOrderFlowState};
 use std::thread;
 use tokio::runtime;
 use tokio::sync::oneshot;
@@ -10,7 +10,7 @@ pub fn listen_streams(
     dom_state: SharedDomState,
     order_flow_state: SharedOrderFlowState,
     symbol: String,
-    interval: String,
+    interval: Interval,
     candles_limit: usize,
     dom_limit: usize,
 ) -> (thread::JoinHandle<()>, oneshot::Sender<()>) {

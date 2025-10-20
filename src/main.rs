@@ -53,7 +53,7 @@ fn main() {
     )
     .unwrap();
 
-    let interval = "5m";
+    let mut interval = config.candle_interval_initial;
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
@@ -64,7 +64,7 @@ fn main() {
         shared_dom_state.clone(),
         shared_order_flow_state.clone(),
         symbol.slug.to_string(),
-        interval.to_string(),
+        interval,
         candles_limit,
         500,
     );
@@ -129,6 +129,18 @@ fn main() {
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
             px_per_tick.scale_out()
+        }
+
+        if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
+        {
+            interval = interval.up();
+        }
+
+        if window.is_key_pressed(Key::Left, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
+        {
+            interval = interval.down()
         }
 
         if let Some(center_price) = center {

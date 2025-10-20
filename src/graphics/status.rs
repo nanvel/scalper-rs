@@ -1,4 +1,4 @@
-use crate::models::{Area, Config};
+use crate::models::{Area, Config, Interval};
 use font_kit::font::Font;
 use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, Source, StrokeStyle};
 use std::fs;
@@ -13,7 +13,7 @@ impl StatusRenderer {
         Self { area, padding: 2 }
     }
 
-    pub fn render(&self, interval: &str, dt: &mut DrawTarget, config: &Config) {
+    pub fn render(&self, interval: Interval, dt: &mut DrawTarget, config: &Config) {
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
@@ -31,7 +31,7 @@ impl StatusRenderer {
         dt.draw_text(
             &font,
             (text_height * 72 / 96) as f32,
-            interval,
+            interval.slug(),
             Point::new(
                 (self.area.left + self.padding * 2) as f32,
                 (self.area.top + self.area.height / 2 + self.padding * 2) as f32,
