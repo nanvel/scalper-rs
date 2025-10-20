@@ -6,13 +6,44 @@ mod use_cases;
 use binance::api::load_symbol;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
-use models::{CandlesState, Config, DomState, Layout, OrderFlowState, PxPerTick};
+use models::{CandlesState, Config, DomState, Interval, Layout, OrderFlowState, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
 use std::sync::{Arc, RwLock};
 use tokio::runtime;
 use use_cases::listen_streams::listen_streams;
+
+fn restart_streams(
+    handle: std::thread::JoinHandle<()>,
+    stop_tx: tokio::sync::oneshot::Sender<()>,
+    shared_candles_state: Arc<RwLock<CandlesState>>,
+    shared_dom_state: Arc<RwLock<DomState>>,
+    shared_order_flow_state: Arc<RwLock<OrderFlowState>>,
+    symbol_slug: String,
+    interval: Interval,
+    candles_limit: usize,
+) -> (
+    std::thread::JoinHandle<()>,
+    tokio::sync::oneshot::Sender<()>,
+) {
+    // best-effort shutdown of previous listener
+    let _ = stop_tx.send(());
+    let _ = handle.join();
+
+    shared_candles_state.write().unwrap().clear();
+    shared_dom_state.write().unwrap().clear();
+
+    listen_streams(
+        shared_candles_state,
+        shared_dom_state,
+        shared_order_flow_state,
+        symbol_slug,
+        interval,
+        candles_limit,
+        500,
+    )
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -59,7 +90,7 @@ fn main() {
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
 
-    let (handle, stop_tx) = listen_streams(
+    let (mut handle, mut stop_tx) = listen_streams(
         shared_candles_state.clone(),
         shared_dom_state.clone(),
         shared_order_flow_state.clone(),
@@ -134,13 +165,47 @@ fn main() {
         if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            interval = interval.up();
+            let new_interval = interval.up();
+            if new_interval != interval {
+                interval = new_interval;
+                // Restart streams with new interval: stop previous, join, then start new
+                let (new_handle, new_stop) = restart_streams(
+                    handle,
+                    stop_tx,
+                    shared_candles_state.clone(),
+                    shared_dom_state.clone(),
+                    shared_order_flow_state.clone(),
+                    symbol.slug.to_string(),
+                    interval,
+                    candles_limit,
+                );
+                handle = new_handle;
+                stop_tx = new_stop;
+                center = None;
+            }
         }
 
         if window.is_key_pressed(Key::Left, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            interval = interval.down()
+            let new_interval = interval.down();
+            if new_interval != interval {
+                interval = new_interval;
+                // Restart streams with new interval: stop previous, join, then start new
+                let (new_handle, new_stop) = restart_streams(
+                    handle,
+                    stop_tx,
+                    shared_candles_state.clone(),
+                    shared_dom_state.clone(),
+                    shared_order_flow_state.clone(),
+                    symbol.slug.to_string(),
+                    interval,
+                    candles_limit,
+                );
+                handle = new_handle;
+                stop_tx = new_stop;
+                center = None;
+            }
         }
 
         if let Some(center_price) = center {
