@@ -111,7 +111,6 @@ pub async fn start_market_stream(
         symbol.to_lowercase(),
         symbol.to_lowercase(),
     );
-    dbg!(&ws_url);
     let (ws_stream, _) = connect_async(ws_url).await?;
     let (_write, mut read) = ws_stream.split();
 
@@ -153,6 +152,9 @@ pub async fn start_market_stream(
                 if let Some(data) = extract_inner(&text) {
                     if let Ok(event) = serde_json::from_value::<DepthUpdateEvent>(data.clone()) {
                         let mut buffer = shared_dom_state.write().unwrap();
+                        if event.update_id <= snapshot.last_update_id {
+                            continue;
+                        }
                         for b in event.bids.iter() {
                             if let (Ok(price), Ok(qty)) =
                                 (Decimal::from_str(&b[0]), Decimal::from_str(&b[1]))

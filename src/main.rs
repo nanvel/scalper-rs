@@ -59,7 +59,7 @@ fn main() {
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
 
-    listen_streams(
+    let (handle, stop_tx) = listen_streams(
         shared_candles_state.clone(),
         shared_dom_state.clone(),
         shared_order_flow_state.clone(),
@@ -157,11 +157,14 @@ fn main() {
                 px_per_tick.get(),
             );
         }
-        status_renderer.render(&symbol.slug, interval, &mut dt, &config);
+        status_renderer.render(interval, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
             .update_with_buffer(&pixels_buffer, window_width, window_height)
             .unwrap();
     }
+
+    let _ = stop_tx.send(());
+    let _ = handle.join();
 }

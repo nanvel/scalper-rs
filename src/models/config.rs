@@ -1,4 +1,4 @@
-use super::color::Color;
+use super::{color::Color, interval::Interval};
 use rust_decimal::{Decimal, prelude::FromStr};
 
 pub struct Config {
@@ -21,6 +21,8 @@ pub struct Config {
 
     pub px_per_tick_choices: Vec<Decimal>,
     pub px_per_tick_initial: Decimal,
+
+    pub candle_interval_initial: Interval,
 }
 
 impl Default for Config {
@@ -61,6 +63,7 @@ impl Default for Config {
                 Decimal::from_str("21").unwrap(),
             ],
             px_per_tick_initial: Decimal::from_str("1").unwrap(),
+            candle_interval_initial: Interval::M5,
         }
     }
 }

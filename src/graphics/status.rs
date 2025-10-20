@@ -13,7 +13,7 @@ impl StatusRenderer {
         Self { area, padding: 2 }
     }
 
-    pub fn render(&self, symbol: &str, interval: &str, dt: &mut DrawTarget, config: &Config) {
+    pub fn render(&self, interval: &str, dt: &mut DrawTarget, config: &Config) {
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
