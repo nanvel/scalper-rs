@@ -19,7 +19,7 @@ impl StatusRenderer {
             self.area.top as f32,
             self.area.width as f32,
             self.area.height as f32,
-            &Source::Solid(config.background_color.into()),
+            &Source::Solid(config.status_background_color.into()),
             &DrawOptions::new(),
         );
 
@@ -37,27 +37,6 @@ impl StatusRenderer {
                 (self.area.top + self.area.height / 2 + self.padding * 2) as f32,
             ),
             &Source::Solid(config.text_color.into()),
-            &DrawOptions::new(),
-        );
-
-        // border
-        let mut pb = PathBuilder::new();
-        pb.move_to(self.area.left as f32, self.area.top as f32);
-        pb.line_to(
-            (self.area.left + self.area.width) as f32,
-            self.area.top as f32,
-        );
-        let path = pb.finish();
-
-        dt.stroke(
-            &path,
-            &Source::Solid(config.border_color.into()),
-            &StrokeStyle {
-                width: 1.0,
-                cap: LineCap::Round,
-                join: LineJoin::Round,
-                ..Default::default()
-            },
             &DrawOptions::new(),
         );
     }

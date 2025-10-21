@@ -1,9 +1,12 @@
-use crate::models::{Area, CandlesState, Config, Timestamp};
+use crate::models::{Area, CandlesState, Color, Config, Timestamp};
+use font_kit::font::Font;
 use raqote::{
-    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
+    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, SolidSource, Source,
+    StrokeStyle,
 };
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+use std::fs;
 use std::sync::RwLockReadGuard;
 
 pub struct CandlesRenderer {
@@ -127,6 +130,71 @@ impl CandlesRenderer {
             let path = pb.finish();
 
             dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
+        }
+
+        // scale
+        let visible_ticks = (self.area.height as f64) / px_per_tick.to_f64().unwrap();
+        let mut m = 1;
+        while visible_ticks / m.to_f64().unwrap() > 10.0 {
+            m *= 10;
+        }
+        if visible_ticks / m.to_f64().unwrap() > 5. {
+            m /= 2;
+        }
+        let m = Decimal::from(m) * tick_size;
+        let tick_price = (center / m).floor() * m;
+
+        let font_data = fs::read("/System/Library/Fonts/SFNSMono.ttf".to_string())
+            .expect("Failed to read font file");
+        let font = Font::from_bytes(font_data.into(), 0).expect("Failed to load font");
+
+        dt.draw_text(
+            &font,
+            (14 * 72 / 96) as f32,
+            &tick_price.to_string(),
+            Point::new((self.area.width - 50) as f32, price_to_y(tick_price) as f32),
+            &Source::Solid(config.text_color.into()),
+            &DrawOptions::new(),
+        );
+
+        let mut pb = PathBuilder::new();
+        let delta = tick_price / Decimal::from(100);
+        pb.rect(
+            self.area.width as f32 - 3.0,
+            price_to_y(tick_price + delta) as f32,
+            2.0,
+            (price_to_y(tick_price) - price_to_y(tick_price + delta)) as f32,
+        );
+        let path = pb.finish();
+
+        dt.fill(
+            &path,
+            &Source::Solid(Color::BLUE.into()),
+            &DrawOptions::new(),
+        );
+
+        for i in 0..5 {
+            let tp = tick_price + m * Decimal::from(i);
+            dt.draw_text(
+                &font,
+                (14 * 72 / 96) as f32,
+                &tp.to_string(),
+                Point::new((self.area.width - 50) as f32, price_to_y(tp) as f32),
+                &Source::Solid(config.text_color.into()),
+                &DrawOptions::new(),
+            );
+        }
+
+        for i in 0..5 {
+            let tp = tick_price - m * Decimal::from(i);
+            dt.draw_text(
+                &font,
+                (14 * 72 / 96) as f32,
+                &tp.to_string(),
+                Point::new((self.area.width - 50) as f32, price_to_y(tp) as f32),
+                &Source::Solid(config.text_color.into()),
+                &DrawOptions::new(),
+            );
         }
 
         // current price line
