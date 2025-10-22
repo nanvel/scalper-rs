@@ -45,3 +45,6 @@ pub async fn load_symbol(symbol: &str) -> Result<Symbol, Box<dyn std::error::Err
 
     Err("Symbol not found".into())
 }
+
+// https://fapi.binance.com/futures/data/openInterestHist?symbol=RIVERUSDT&period=5m
+// https://fapi.binance.com/fapi/v1/openInterest?symbol=RIVERUSDT

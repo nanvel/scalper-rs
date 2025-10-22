@@ -4,6 +4,7 @@ mod config;
 mod dom;
 mod interval;
 mod layout;
+mod open_interest;
 mod order_flow;
 mod px_per_tick;
 mod symbol;
