@@ -153,13 +153,13 @@ fn main() {
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_in()
+            px_per_tick.scale_out()
         }
 
         if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_out()
+            px_per_tick.scale_in()
         }
 
         if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)

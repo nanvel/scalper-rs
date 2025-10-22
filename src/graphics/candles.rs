@@ -132,14 +132,68 @@ impl CandlesRenderer {
             dt.fill(&path, &Source::Solid(color), &DrawOptions::new());
         }
 
+        // Draw volume bars in the reserved bottom area
+        let volume_height = (self.area.height / 6).min(60);
+        let mut max_volume = Decimal::ZERO;
+        for c in &candles {
+            if c.volume > max_volume {
+                max_volume = c.volume;
+            }
+        }
+
+        dt.fill_rect(
+            self.area.left as f32,
+            (self.area.height - volume_height - 5) as f32,
+            self.area.width as f32,
+            (volume_height + 5) as f32,
+            &Source::Solid(config.background_color.into()),
+            &DrawOptions::new(),
+        );
+
+        dt.fill_rect(
+            self.area.left as f32,
+            (self.area.height - volume_height - 5) as f32,
+            self.area.width as f32,
+            1.,
+            &Source::Solid(config.border_color.into()),
+            &DrawOptions::new(),
+        );
+
+        if max_volume > Decimal::ZERO {
+            let vh_dec = Decimal::from_i32(volume_height).unwrap_or(Decimal::from(40));
+            for (i, candle) in candles.iter().rev().enumerate() {
+                let x = self.area.width + self.area.left - self.padding - (i as i32) * candle_width;
+
+                // Compute bar height proportional to volume
+                let bar_height = ((candle.volume / max_volume) * vh_dec)
+                    .to_i32()
+                    .unwrap_or(0)
+                    .max(1);
+
+                let bar_top = (self.area.top + self.area.height) - bar_height;
+                let bar_left = x - (body_width / 2);
+
+                let vol_color: SolidSource = if candle.is_bullish() {
+                    config.bullish_color.into()
+                } else {
+                    config.bearish_color.into()
+                };
+
+                let mut pb = PathBuilder::new();
+                pb.rect(bar_left as f32, bar_top as f32, 3., bar_height as f32);
+                let path = pb.finish();
+                dt.fill(&path, &Source::Solid(vol_color), &DrawOptions::new());
+            }
+        }
+
         // scale
         let visible_ticks = (self.area.height as f64) / px_per_tick.to_f64().unwrap();
         let mut m = 1;
         while visible_ticks / m.to_f64().unwrap() > 10.0 {
             m *= 10;
         }
-        if visible_ticks / m.to_f64().unwrap() > 5. {
-            m /= 2;
+        if visible_ticks / m.to_f64().unwrap() > 4. {
+            m *= 2;
         }
         let m = Decimal::from(m) * tick_size;
         let tick_price = (center / m).floor() * m;
@@ -173,7 +227,7 @@ impl CandlesRenderer {
             &DrawOptions::new(),
         );
 
-        for i in 0..5 {
+        for i in 0..3 {
             let tp = tick_price + m * Decimal::from(i);
             dt.draw_text(
                 &font,
@@ -185,7 +239,7 @@ impl CandlesRenderer {
             );
         }
 
-        for i in 0..5 {
+        for i in 0..3 {
             let tp = tick_price - m * Decimal::from(i);
             dt.draw_text(
                 &font,

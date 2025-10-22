@@ -49,6 +49,18 @@ impl Color {
         g: 102,
         b: 204,
     };
+    pub const LIGHT_GREEN: Color = Color {
+        a: 255,
+        r: 0,
+        g: 220,
+        b: 0,
+    };
+    pub const LIGHT_RED: Color = Color {
+        a: 255,
+        r: 255,
+        g: 80,
+        b: 80,
+    };
 
     pub fn with_alpha(&self, alpha: u8) -> Color {
         Color {
