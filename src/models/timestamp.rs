@@ -12,6 +12,10 @@ impl Timestamp {
 
         Timestamp(duration.as_secs())
     }
+
+    pub fn seconds(&self) -> u64 {
+        self.0
+    }
 }
 
 impl fmt::Display for Timestamp {

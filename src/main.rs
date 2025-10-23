@@ -6,12 +6,15 @@ mod use_cases;
 use binance::api::load_symbol;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
-use models::{CandlesState, Config, DomState, Interval, Layout, OrderFlowState, PxPerTick};
+use models::{
+    CandlesState, Config, DomState, Interval, Layout, OpenInterestState, OrderFlowState, PxPerTick,
+};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
 use std::sync::{Arc, RwLock};
 use tokio::runtime;
+use use_cases::listen_open_interest::listen_open_interest;
 use use_cases::listen_streams::listen_streams;
 
 fn restart_streams(
@@ -89,6 +92,7 @@ fn main() {
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
+    let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
     let (mut handle, mut stop_tx) = listen_streams(
         shared_candles_state.clone(),
@@ -99,6 +103,8 @@ fn main() {
         candles_limit,
         500,
     );
+
+    listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32, &config);

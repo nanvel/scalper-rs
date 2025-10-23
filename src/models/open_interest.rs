@@ -19,11 +19,11 @@ impl OpenInterestState {
     }
 
     pub fn push(&mut self, time: &Timestamp, open_interest: Decimal) {
-        self.data.insert(time.value() / 60 * 60, open_interest);
+        self.data.insert(time.seconds() / 60 * 60, open_interest);
     }
 
     pub fn get(&self, time: &Timestamp) -> Option<Decimal> {
-        match self.data.get(time.value() / 60 * 60) {
+        match self.data.get(&(time.seconds() / 60 * 60)) {
             Some(oi) => Some(*oi),
             None => None,
         }
