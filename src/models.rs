@@ -16,6 +16,7 @@ pub use config::Config;
 pub use dom::{DomState, SharedDomState};
 pub use interval::Interval;
 pub use layout::{Area, Layout};
+pub use open_interest::{OpenInterestState, SharedOpenInterestState};
 pub use order_flow::{OrderFlowState, SharedOrderFlowState};
 pub use px_per_tick::PxPerTick;
 pub use symbol::Symbol;
