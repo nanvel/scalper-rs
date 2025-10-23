@@ -1,4 +1,4 @@
-use crate::models::{Area, CandlesState, Color, Config, Timestamp};
+use crate::models::{Area, CandlesState, Color, Config, OpenInterestState, Timestamp};
 use font_kit::font::Font;
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, SolidSource, Source,
@@ -27,6 +27,7 @@ impl CandlesRenderer {
     pub fn render(
         &mut self,
         candles_state: RwLockReadGuard<CandlesState>,
+        open_interest_state: RwLockReadGuard<OpenInterestState>,
         dt: &mut DrawTarget,
         config: &Config,
         tick_size: Decimal,
@@ -135,11 +136,23 @@ impl CandlesRenderer {
         // Draw volume bars in the reserved bottom area
         let volume_height = (self.area.height / 6).min(60);
         let mut max_volume = Decimal::ZERO;
+        let mut max_oi = Decimal::ZERO;
+        let mut min_oi = Decimal::MAX;
         for c in &candles {
             if c.volume > max_volume {
                 max_volume = c.volume;
             }
+            let oi = open_interest_state
+                .get(&c.open_time)
+                .unwrap_or(Decimal::ZERO);
+            if oi > max_oi {
+                max_oi = oi;
+            }
+            if oi < min_oi {
+                min_oi = oi;
+            }
         }
+        let oi_diff = max_oi - min_oi;
 
         dt.fill_rect(
             self.area.left as f32,
@@ -170,6 +183,19 @@ impl CandlesRenderer {
                     .unwrap_or(0)
                     .max(1);
 
+                let oi_height = if max_oi > Decimal::ZERO {
+                    (((open_interest_state
+                        .get(&candle.open_time)
+                        .unwrap_or(Decimal::ZERO)
+                        - min_oi)
+                        / oi_diff)
+                        * vh_dec)
+                        .to_i32()
+                        .unwrap_or(0)
+                } else {
+                    0
+                };
+
                 let bar_top = (self.area.top + self.area.height) - bar_height;
                 let bar_left = x - (body_width / 2);
 
@@ -183,6 +209,16 @@ impl CandlesRenderer {
                 pb.rect(bar_left as f32, bar_top as f32, 3., bar_height as f32);
                 let path = pb.finish();
                 dt.fill(&path, &Source::Solid(vol_color), &DrawOptions::new());
+
+                let oi_top = (self.area.top + self.area.height) - oi_height;
+                let mut pb = PathBuilder::new();
+                pb.rect((bar_left + 6) as f32, oi_top as f32, 3., oi_height as f32);
+                let path = pb.finish();
+                dt.fill(
+                    &path,
+                    &Source::Solid(Color::GRAY.into()),
+                    &DrawOptions::new(),
+                );
             }
         }
 

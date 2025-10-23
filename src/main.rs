@@ -217,6 +217,7 @@ fn main() {
         if let Some(center_price) = center {
             candles_renderer.render(
                 shared_candles_state.read().unwrap(),
+                shared_open_interest_state.read().unwrap(),
                 &mut dt,
                 &config,
                 symbol.tick_size,

@@ -89,7 +89,7 @@ pub async fn start_market_stream(
     let initial_candles: Vec<Candle> = data
         .iter()
         .map(|k| Candle {
-            open_time: k[0].as_u64().unwrap().into(),
+            open_time: (k[0].as_u64().unwrap() / 1000).into(),
             open: Decimal::from_str(k[1].as_str().unwrap()).unwrap_or(Decimal::ZERO),
             high: Decimal::from_str(k[2].as_str().unwrap()).unwrap_or(Decimal::ZERO),
             low: Decimal::from_str(k[3].as_str().unwrap()).unwrap_or(Decimal::ZERO),
@@ -191,7 +191,7 @@ pub async fn start_market_stream(
                         }
                     } else if let Ok(event) = serde_json::from_value::<KlineEvent>(data.clone()) {
                         let candle = Candle {
-                            open_time: event.kline.start_time.into(),
+                            open_time: (event.kline.start_time / 1000).into(),
                             open: Decimal::from_str(&event.kline.open).unwrap_or(Decimal::ZERO),
                             high: Decimal::from_str(&event.kline.high).unwrap_or(Decimal::ZERO),
                             low: Decimal::from_str(&event.kline.low).unwrap_or(Decimal::ZERO),

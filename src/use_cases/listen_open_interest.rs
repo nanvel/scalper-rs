@@ -2,6 +2,7 @@ use crate::models::{SharedOpenInterestState, Timestamp};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use std::os::macos::raw::stat;
 use std::str::FromStr;
 use std::thread;
 use tokio::runtime;
@@ -62,7 +63,7 @@ pub fn listen_open_interest(open_interest_state: SharedOpenInterestState, symbol
                         Ok(json) => {
                             if let Ok(oi) = serde_json::from_value::<CurrentEntry>(json.clone()) {
                                 let mut state = open_interest_state.write().unwrap();
-                                let ts = Timestamp::from(oi.timestamp);
+                                let ts = Timestamp::from(oi.timestamp / 1000);
                                 state.push(&ts, Decimal::from_str(oi.open_interest.as_str()).unwrap());
                                 state.online = true;
                                 state.updated = ts;
@@ -76,7 +77,7 @@ pub fn listen_open_interest(open_interest_state: SharedOpenInterestState, symbol
                         eprintln!("Request error fetching openInterest: {}", e);
                         let mut state = open_interest_state.write().unwrap();
                         state.online = false;
-                    },
+                    }
                 }
 
                 sleep(Duration::from_secs(5)).await;
