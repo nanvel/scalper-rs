@@ -7,7 +7,8 @@ use binance::api::load_symbol;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
 use models::{
-    CandlesState, Config, DomState, Interval, Layout, OpenInterestState, OrderFlowState, PxPerTick,
+    CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
+    OrderFlowState, PxPerTick,
 };
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
@@ -72,6 +73,7 @@ fn main() {
         });
 
     let config = Config::default();
+    let color_schema = ColorSchema::dark();
 
     let mut window_width = 800;
     let mut window_height = 600;
@@ -148,14 +150,6 @@ fn main() {
             }
         }
 
-        if let Some((_, scroll_y)) = window.get_scroll_wheel() {
-            if scroll_y > 0.0 {
-                px_per_tick.scale_in()
-            } else if scroll_y < 0.0 {
-                px_per_tick.scale_out()
-            }
-        }
-
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
@@ -219,7 +213,7 @@ fn main() {
                 shared_candles_state.read().unwrap(),
                 shared_open_interest_state.read().unwrap(),
                 &mut dt,
-                &config,
+                &color_schema,
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
@@ -227,7 +221,7 @@ fn main() {
             dom_renderer.render(
                 shared_dom_state.read().unwrap(),
                 &mut dt,
-                &config,
+                &color_schema,
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
@@ -235,13 +229,13 @@ fn main() {
             order_flow_renderer.render(
                 shared_order_flow_state.read().unwrap(),
                 &mut dt,
-                &config,
+                &color_schema,
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
             );
         }
-        status_renderer.render(interval, &mut dt, &config);
+        status_renderer.render(interval, &mut dt, &color_schema);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window

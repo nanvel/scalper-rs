@@ -1,5 +1,5 @@
-use crate::models::{Area, Config, DomState, Timestamp};
-use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Source, StrokeStyle};
+use crate::models::{Area, ColorSchema, DomState, Timestamp};
+use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::sync::RwLockReadGuard;
@@ -23,7 +23,7 @@ impl DomRenderer {
         &mut self,
         dom_state: RwLockReadGuard<DomState>,
         dt: &mut DrawTarget,
-        config: &Config,
+        color_schema: &ColorSchema,
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
@@ -40,7 +40,7 @@ impl DomRenderer {
             self.area.top as f32,
             self.area.width as f32,
             self.area.height as f32,
-            &Source::Solid(config.background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
@@ -98,7 +98,7 @@ impl DomRenderer {
                     y - 1.0,
                     width,
                     3.0,
-                    &Source::Solid(config.bid_color.into()),
+                    &Source::Solid(color_schema.bid_bar.into()),
                     &DrawOptions::new(),
                 );
             } else if px_per_tick >= Decimal::from(5) {
@@ -107,7 +107,7 @@ impl DomRenderer {
                     y - (px_per_tick.to_f32().unwrap() / 2.0).floor(),
                     width,
                     px_per_tick.to_f32().unwrap() - 2.0,
-                    &Source::Solid(config.bid_color.into()),
+                    &Source::Solid(color_schema.bid_bar.into()),
                     &DrawOptions::new(),
                 );
             } else {
@@ -116,7 +116,7 @@ impl DomRenderer {
                     y,
                     width,
                     1.0,
-                    &Source::Solid(config.bid_color.into()),
+                    &Source::Solid(color_schema.bid_bar.into()),
                     &DrawOptions::new(),
                 );
             }
@@ -136,7 +136,7 @@ impl DomRenderer {
                     y - 1.0,
                     width,
                     3.0,
-                    &Source::Solid(config.ask_color.into()),
+                    &Source::Solid(color_schema.ask_bar.into()),
                     &DrawOptions::new(),
                 );
             } else if px_per_tick >= Decimal::from(5) {
@@ -145,7 +145,7 @@ impl DomRenderer {
                     y - (px_per_tick.to_f32().unwrap() / 2.0).floor(),
                     width,
                     px_per_tick.to_f32().unwrap() - 2.0,
-                    &Source::Solid(config.ask_color.into()),
+                    &Source::Solid(color_schema.ask_bar.into()),
                     &DrawOptions::new(),
                 );
             } else {
@@ -154,7 +154,7 @@ impl DomRenderer {
                     y,
                     width,
                     1.0,
-                    &Source::Solid(config.ask_color.into()),
+                    &Source::Solid(color_schema.ask_bar.into()),
                     &DrawOptions::new(),
                 );
             }

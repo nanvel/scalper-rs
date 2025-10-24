@@ -1,4 +1,4 @@
-use crate::models::{Area, CandlesState, Color, Config, OpenInterestState, Timestamp};
+use crate::models::{Area, CandlesState, ColorSchema, OpenInterestState, Timestamp};
 use font_kit::font::Font;
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, SolidSource, Source,
@@ -29,7 +29,7 @@ impl CandlesRenderer {
         candles_state: RwLockReadGuard<CandlesState>,
         open_interest_state: RwLockReadGuard<OpenInterestState>,
         dt: &mut DrawTarget,
-        config: &Config,
+        color_schema: &ColorSchema,
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
@@ -46,7 +46,7 @@ impl CandlesRenderer {
             self.area.top as f32,
             self.area.width as f32,
             self.area.height as f32,
-            &Source::Solid(config.background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
@@ -94,9 +94,9 @@ impl CandlesRenderer {
             let low_y = price_to_y(candle.low);
 
             let color: SolidSource = if candle.is_bullish() {
-                config.bullish_color.into()
+                color_schema.bullish_candle.into()
             } else {
-                config.bearish_color.into()
+                color_schema.bearish_candle.into()
             };
 
             let mut pb = PathBuilder::new();
@@ -159,7 +159,7 @@ impl CandlesRenderer {
             (self.area.height - volume_height - 5) as f32,
             self.area.width as f32,
             (volume_height + 5) as f32,
-            &Source::Solid(config.background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
@@ -168,7 +168,7 @@ impl CandlesRenderer {
             (self.area.height - volume_height - 5) as f32,
             self.area.width as f32,
             1.,
-            &Source::Solid(config.border_color.into()),
+            &Source::Solid(color_schema.border.into()),
             &DrawOptions::new(),
         );
 
@@ -200,9 +200,9 @@ impl CandlesRenderer {
                 let bar_left = x - (body_width / 2);
 
                 let vol_color: SolidSource = if candle.is_bullish() {
-                    config.bullish_color.into()
+                    color_schema.bullish_candle.into()
                 } else {
-                    config.bearish_color.into()
+                    color_schema.bearish_candle.into()
                 };
 
                 let mut pb = PathBuilder::new();
@@ -216,7 +216,7 @@ impl CandlesRenderer {
                 let path = pb.finish();
                 dt.fill(
                     &path,
-                    &Source::Solid(Color::GRAY.into()),
+                    &Source::Solid(color_schema.open_interest.into()),
                     &DrawOptions::new(),
                 );
             }
@@ -237,7 +237,7 @@ impl CandlesRenderer {
             let path = pb.finish();
             dt.fill(
                 &path,
-                &Source::Solid(Color::BLUE.into()),
+                &Source::Solid(color_schema.scale_bar.into()),
                 &DrawOptions::new(),
             );
         }
@@ -263,7 +263,7 @@ impl CandlesRenderer {
             (14 * 72 / 96) as f32,
             &tick_price.to_string(),
             Point::new((self.area.width - 50) as f32, price_to_y(tick_price) as f32),
-            &Source::Solid(config.text_color.into()),
+            &Source::Solid(color_schema.text_light.into()),
             &DrawOptions::new(),
         );
 
@@ -279,7 +279,7 @@ impl CandlesRenderer {
 
         dt.fill(
             &path,
-            &Source::Solid(Color::BLUE.into()),
+            &Source::Solid(color_schema.scale_bar.into()),
             &DrawOptions::new(),
         );
 
@@ -290,7 +290,7 @@ impl CandlesRenderer {
                 (14 * 72 / 96) as f32,
                 &tp.to_string(),
                 Point::new((self.area.width - 50) as f32, price_to_y(tp) as f32),
-                &Source::Solid(config.text_color.into()),
+                &Source::Solid(color_schema.text_light.into()),
                 &DrawOptions::new(),
             );
         }
@@ -302,7 +302,7 @@ impl CandlesRenderer {
                 (14 * 72 / 96) as f32,
                 &tp.to_string(),
                 Point::new((self.area.width - 50) as f32, price_to_y(tp) as f32),
-                &Source::Solid(config.text_color.into()),
+                &Source::Solid(color_schema.text_light.into()),
                 &DrawOptions::new(),
             );
         }
@@ -318,7 +318,7 @@ impl CandlesRenderer {
 
         dt.stroke(
             &path,
-            &Source::Solid(config.current_price_color.into()),
+            &Source::Solid(color_schema.crosshair.into()),
             &StrokeStyle {
                 width: 1.0,
                 cap: LineCap::Round,

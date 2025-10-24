@@ -1,6 +1,6 @@
-use crate::models::{Area, Config, Interval};
+use crate::models::{Area, ColorSchema, Interval};
 use font_kit::font::Font;
-use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, Source, StrokeStyle};
+use raqote::{DrawOptions, DrawTarget, Point, Source};
 use std::fs;
 
 pub struct StatusRenderer {
@@ -13,13 +13,13 @@ impl StatusRenderer {
         Self { area, padding: 2 }
     }
 
-    pub fn render(&self, interval: Interval, dt: &mut DrawTarget, config: &Config) {
+    pub fn render(&self, interval: Interval, dt: &mut DrawTarget, color_schema: &ColorSchema) {
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
             self.area.width as f32,
             self.area.height as f32,
-            &Source::Solid(config.status_background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
@@ -36,7 +36,7 @@ impl StatusRenderer {
                 (self.area.left + self.padding * 2) as f32,
                 (self.area.top + self.area.height / 2 + self.padding * 2) as f32,
             ),
-            &Source::Solid(config.text_color.into()),
+            &Source::Solid(color_schema.text_light.into()),
             &DrawOptions::new(),
         );
     }

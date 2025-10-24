@@ -1,5 +1,6 @@
 mod candles;
 mod color;
+mod color_schema;
 mod config;
 mod dom;
 mod interval;
@@ -12,6 +13,7 @@ mod timestamp;
 
 pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use color::Color;
+pub use color_schema::ColorSchema;
 pub use config::Config;
 pub use dom::{DomState, SharedDomState};
 pub use interval::Interval;
