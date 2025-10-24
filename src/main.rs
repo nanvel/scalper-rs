@@ -118,10 +118,7 @@ fn main() {
     window.set_target_fps(60);
 
     let mut center: Option<Decimal> = None;
-    let mut px_per_tick = PxPerTick::new(
-        config.px_per_tick_initial,
-        config.px_per_tick_choices.clone(),
-    );
+    let mut px_per_tick = PxPerTick::new(config.px_per_tick_initial);
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let current_center = shared_dom_state.read().unwrap().center() {
             if center.is_some() {
