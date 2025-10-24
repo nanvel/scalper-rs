@@ -8,6 +8,12 @@ const PX_PER_TICK_CHOICES: [&str; 17] = [
 
 pub struct PxPerTick(Decimal);
 
+impl Default for PxPerTick {
+    fn default() -> Self {
+        Self(Decimal::from_str("1").unwrap())
+    }
+}
+
 impl PxPerTick {
     pub fn new(value: Decimal) -> Self {
         Self(value)

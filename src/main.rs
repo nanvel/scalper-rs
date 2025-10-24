@@ -72,7 +72,7 @@ fn main() {
             std::process::exit(1);
         });
 
-    let config = Config::default();
+    let config = Config::load();
     let color_schema = ColorSchema::dark();
 
     let mut window_width = 800;
@@ -89,7 +89,7 @@ fn main() {
     )
     .unwrap();
 
-    let mut interval = config.candle_interval_initial;
+    let mut interval = Interval::M5;
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
@@ -109,7 +109,7 @@ fn main() {
     listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
-    let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
+    let mut layout = Layout::new(window_width as i32, window_height as i32);
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
     let mut dom_renderer = DomRenderer::new(layout.dom_area);
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
@@ -118,7 +118,7 @@ fn main() {
     window.set_target_fps(60);
 
     let mut center: Option<Decimal> = None;
-    let mut px_per_tick = PxPerTick::new(config.px_per_tick_initial);
+    let mut px_per_tick = PxPerTick::default();
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let current_center = shared_dom_state.read().unwrap().center() {
             if center.is_some() {
@@ -139,7 +139,7 @@ fn main() {
                 window_height = new_height;
 
                 dt = DrawTarget::new(window_width as i32, window_height as i32);
-                layout = Layout::new(window_width as i32, window_height as i32, &config);
+                layout = Layout::new(window_width as i32, window_height as i32);
                 candles_renderer = CandlesRenderer::new(layout.candles_area);
                 dom_renderer = DomRenderer::new(layout.dom_area);
                 order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);

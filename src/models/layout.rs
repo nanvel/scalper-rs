@@ -1,5 +1,3 @@
-use super::config::Config;
-
 pub struct Area {
     pub left: i32,
     pub top: i32,
@@ -15,33 +13,37 @@ pub struct Layout {
 }
 
 impl Layout {
-    pub fn new(window_width: i32, window_height: i32, config: &Config) -> Self {
+    pub fn new(window_width: i32, window_height: i32) -> Self {
+        let dom_width = 100;
+        let order_flow_width = 100;
+        let status_height = 20;
+
         let status_area = Area {
             left: 0,
-            top: window_height - config.status_height,
+            top: window_height - status_height,
             width: window_width,
-            height: config.status_height,
+            height: status_height,
         };
 
         let candles_area = Area {
             left: 0,
             top: 0,
-            width: window_width - config.dom_width - config.order_flow_width,
-            height: window_height - config.status_height,
+            width: window_width - dom_width - order_flow_width,
+            height: window_height - status_height,
         };
 
         let dom_area = Area {
-            left: window_width - config.order_flow_width - config.dom_width,
+            left: window_width - order_flow_width - dom_width,
             top: 0,
-            width: config.dom_width,
-            height: window_height - config.status_height,
+            width: dom_width,
+            height: window_height - status_height,
         };
 
         let order_flow_area = Area {
-            left: window_width - config.order_flow_width,
+            left: window_width - order_flow_width,
             top: 0,
-            width: config.order_flow_width,
-            height: window_height - config.status_height,
+            width: order_flow_width,
+            height: window_height - status_height,
         };
 
         Self {

@@ -1,28 +1,37 @@
-use super::interval::Interval;
-use rust_decimal::{Decimal, prelude::FromStr};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub dom_width: i32,
-    pub order_flow_width: i32,
-    pub status_height: i32,
-    pub row_height: i32,
-    pub border_width: i32,
-
-    pub px_per_tick_initial: Decimal,
-
-    pub candle_interval_initial: Interval,
+    pub binance_access_key: Option<String>,
+    pub binance_secret_key: Option<String>,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            dom_width: 100,
-            order_flow_width: 100,
-            status_height: 20,
-            row_height: 10,
-            border_width: 1,
-            px_per_tick_initial: Decimal::from_str("1").unwrap(),
-            candle_interval_initial: Interval::M5,
-        }
+impl Config {
+    pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
+        let config_path = Self::config_path()?;
+
+        let contents = match fs::read_to_string(&config_path) {
+            Ok(c) => c,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(err) => {
+                return Err(format!(
+                    "Failed to read config file at {}: {}",
+                    config_path.display(),
+                    err
+                )
+                .into());
+            }
+        };
+
+        let config: Config = toml::from_str(&contents)?;
+
+        Ok(config)
+    }
+
+    fn config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let home = dirs::home_dir().ok_or("No home directory.")?;
+        Ok(home.join(".scalper").join("config"))
     }
 }
