@@ -148,7 +148,7 @@ impl CandlesRenderer {
             if oi > max_oi {
                 max_oi = oi;
             }
-            if oi < min_oi {
+            if oi < min_oi && oi > Decimal::ZERO {
                 min_oi = oi;
             }
         }
@@ -172,8 +172,8 @@ impl CandlesRenderer {
             &DrawOptions::new(),
         );
 
+        let vh_dec = Decimal::from_i32(volume_height).unwrap_or(Decimal::from(40));
         if max_volume > Decimal::ZERO {
-            let vh_dec = Decimal::from_i32(volume_height).unwrap_or(Decimal::from(40));
             for (i, candle) in candles.iter().rev().enumerate() {
                 let x = self.area.width + self.area.left - self.padding - (i as i32) * candle_width;
 
@@ -220,6 +220,26 @@ impl CandlesRenderer {
                     &DrawOptions::new(),
                 );
             }
+        }
+
+        if max_oi > Decimal::ZERO {
+            let oi_height = (max_oi / Decimal::from(100) / oi_diff * vh_dec)
+                .to_i32()
+                .unwrap_or(0);
+            let oi_top = (self.area.top + self.area.height) - oi_height;
+            let mut pb = PathBuilder::new();
+            pb.rect(
+                (self.area.width - 3) as f32,
+                oi_top as f32,
+                2.,
+                oi_height as f32,
+            );
+            let path = pb.finish();
+            dt.fill(
+                &path,
+                &Source::Solid(Color::BLUE.into()),
+                &DrawOptions::new(),
+            );
         }
 
         // scale
