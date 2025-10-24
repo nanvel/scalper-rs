@@ -1,4 +1,4 @@
-use crate::models::{Candle, SharedCandlesState, SharedDomState, SharedOrderFlowState};
+use crate::models::{Candle, Interval, SharedCandlesState, SharedDomState, SharedOrderFlowState};
 use futures_util::stream::StreamExt;
 use reqwest::Client;
 use rust_decimal::Decimal;
@@ -66,7 +66,7 @@ struct AggTradeEvent {
 
 pub async fn start_market_stream(
     symbol: String,
-    interval: String,
+    interval: Interval,
     candles_limit: usize,
     dom_limit: usize,
     shared_candles_state: SharedCandlesState,
@@ -78,7 +78,9 @@ pub async fn start_market_stream(
     // Fetch initial candles
     let candles_url = format!(
         "https://fapi.binance.com/fapi/v1/klines?symbol={}&interval={}&limit={}",
-        symbol, interval, candles_limit
+        symbol,
+        interval.slug(),
+        candles_limit
     );
 
     let response = http_client.get(&candles_url).send().await?;
@@ -87,7 +89,7 @@ pub async fn start_market_stream(
     let initial_candles: Vec<Candle> = data
         .iter()
         .map(|k| Candle {
-            open_time: k[0].as_u64().unwrap().into(),
+            open_time: (k[0].as_u64().unwrap() / 1000).into(),
             open: Decimal::from_str(k[1].as_str().unwrap()).unwrap_or(Decimal::ZERO),
             high: Decimal::from_str(k[2].as_str().unwrap()).unwrap_or(Decimal::ZERO),
             low: Decimal::from_str(k[3].as_str().unwrap()).unwrap_or(Decimal::ZERO),
@@ -107,11 +109,10 @@ pub async fn start_market_stream(
     let ws_url = format!(
         "wss://fstream.binance.com/stream?streams={}@kline_{}/{}@depth@100ms/{}@aggTrade",
         symbol.to_lowercase(),
-        interval,
+        interval.slug(),
         symbol.to_lowercase(),
         symbol.to_lowercase(),
     );
-    dbg!(&ws_url);
     let (ws_stream, _) = connect_async(ws_url).await?;
     let (_write, mut read) = ws_stream.split();
 
@@ -153,6 +154,9 @@ pub async fn start_market_stream(
                 if let Some(data) = extract_inner(&text) {
                     if let Ok(event) = serde_json::from_value::<DepthUpdateEvent>(data.clone()) {
                         let mut buffer = shared_dom_state.write().unwrap();
+                        if event.update_id <= snapshot.last_update_id {
+                            continue;
+                        }
                         for b in event.bids.iter() {
                             if let (Ok(price), Ok(qty)) =
                                 (Decimal::from_str(&b[0]), Decimal::from_str(&b[1]))
@@ -187,7 +191,7 @@ pub async fn start_market_stream(
                         }
                     } else if let Ok(event) = serde_json::from_value::<KlineEvent>(data.clone()) {
                         let candle = Candle {
-                            open_time: event.kline.start_time.into(),
+                            open_time: (event.kline.start_time / 1000).into(),
                             open: Decimal::from_str(&event.kline.open).unwrap_or(Decimal::ZERO),
                             high: Decimal::from_str(&event.kline.high).unwrap_or(Decimal::ZERO),
                             low: Decimal::from_str(&event.kline.low).unwrap_or(Decimal::ZERO),

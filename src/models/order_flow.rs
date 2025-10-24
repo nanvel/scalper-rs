@@ -20,11 +20,6 @@ impl OrderFlowState {
         }
     }
 
-    pub fn init_snapshot(&mut self, bids: Vec<(Decimal, Decimal)>, asks: Vec<(Decimal, Decimal)>) {
-        self.buys = bids.into_iter().collect();
-        self.sells = asks.into_iter().collect();
-    }
-
     pub fn buy(&mut self, price: Decimal, quantity: Decimal) {
         self.buys.insert(
             price,

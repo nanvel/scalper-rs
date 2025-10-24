@@ -76,6 +76,14 @@ impl CandlesState {
         let index = (self.head + self.capacity - 1) % self.capacity;
         self.data[index]
     }
+
+    pub fn clear(&mut self) {
+        self.data = vec![None; self.capacity].into_boxed_slice();
+        self.head = 0;
+        self.size = 0;
+        self.online = false;
+        self.updated = Timestamp::now();
+    }
 }
 
 #[cfg(test)]

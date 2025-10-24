@@ -6,13 +6,47 @@ mod use_cases;
 use binance::api::load_symbol;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer};
 use minifb::{Key, Window, WindowOptions};
-use models::{CandlesState, Config, DomState, Layout, OrderFlowState, PxPerTick};
+use models::{
+    CandlesState, Config, DomState, Interval, Layout, OpenInterestState, OrderFlowState, PxPerTick,
+};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
 use std::sync::{Arc, RwLock};
 use tokio::runtime;
+use use_cases::listen_open_interest::listen_open_interest;
 use use_cases::listen_streams::listen_streams;
+
+fn restart_streams(
+    handle: std::thread::JoinHandle<()>,
+    stop_tx: tokio::sync::oneshot::Sender<()>,
+    shared_candles_state: Arc<RwLock<CandlesState>>,
+    shared_dom_state: Arc<RwLock<DomState>>,
+    shared_order_flow_state: Arc<RwLock<OrderFlowState>>,
+    symbol_slug: String,
+    interval: Interval,
+    candles_limit: usize,
+) -> (
+    std::thread::JoinHandle<()>,
+    tokio::sync::oneshot::Sender<()>,
+) {
+    // best-effort shutdown of previous listener
+    let _ = stop_tx.send(());
+    let _ = handle.join();
+
+    shared_candles_state.write().unwrap().clear();
+    shared_dom_state.write().unwrap().clear();
+
+    listen_streams(
+        shared_candles_state,
+        shared_dom_state,
+        shared_order_flow_state,
+        symbol_slug,
+        interval,
+        candles_limit,
+        500,
+    )
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -53,21 +87,24 @@ fn main() {
     )
     .unwrap();
 
-    let interval = "5m";
+    let mut interval = config.candle_interval_initial;
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
+    let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
-    listen_streams(
+    let (mut handle, mut stop_tx) = listen_streams(
         shared_candles_state.clone(),
         shared_dom_state.clone(),
         shared_order_flow_state.clone(),
         symbol.slug.to_string(),
-        interval.to_string(),
+        interval,
         candles_limit,
         500,
     );
+
+    listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
@@ -122,18 +159,65 @@ fn main() {
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_in()
+            px_per_tick.scale_out()
         }
 
         if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_out()
+            px_per_tick.scale_in()
+        }
+
+        if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
+        {
+            let new_interval = interval.up();
+            if new_interval != interval {
+                interval = new_interval;
+                // Restart streams with new interval: stop previous, join, then start new
+                let (new_handle, new_stop) = restart_streams(
+                    handle,
+                    stop_tx,
+                    shared_candles_state.clone(),
+                    shared_dom_state.clone(),
+                    shared_order_flow_state.clone(),
+                    symbol.slug.to_string(),
+                    interval,
+                    candles_limit,
+                );
+                handle = new_handle;
+                stop_tx = new_stop;
+                center = None;
+            }
+        }
+
+        if window.is_key_pressed(Key::Left, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
+        {
+            let new_interval = interval.down();
+            if new_interval != interval {
+                interval = new_interval;
+                // Restart streams with new interval: stop previous, join, then start new
+                let (new_handle, new_stop) = restart_streams(
+                    handle,
+                    stop_tx,
+                    shared_candles_state.clone(),
+                    shared_dom_state.clone(),
+                    shared_order_flow_state.clone(),
+                    symbol.slug.to_string(),
+                    interval,
+                    candles_limit,
+                );
+                handle = new_handle;
+                stop_tx = new_stop;
+                center = None;
+            }
         }
 
         if let Some(center_price) = center {
             candles_renderer.render(
                 shared_candles_state.read().unwrap(),
+                shared_open_interest_state.read().unwrap(),
                 &mut dt,
                 &config,
                 symbol.tick_size,
@@ -157,11 +241,14 @@ fn main() {
                 px_per_tick.get(),
             );
         }
-        status_renderer.render(&symbol.slug, interval, &mut dt, &config);
+        status_renderer.render(interval, &mut dt, &config);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
             .update_with_buffer(&pixels_buffer, window_width, window_height)
             .unwrap();
     }
+
+    let _ = stop_tx.send(());
+    let _ = handle.join();
 }

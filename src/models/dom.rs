@@ -48,6 +48,13 @@ impl DomState {
         let best_ask = self.asks.keys().next()?;
         Some(((*best_bid + *best_ask) / Decimal::from(2) / self.tick_size).floor() * self.tick_size)
     }
+
+    pub fn clear(&mut self) {
+        self.bids.clear();
+        self.asks.clear();
+        self.updated = Timestamp::now();
+        self.online = false;
+    }
 }
 
 pub type SharedDomState = Arc<RwLock<DomState>>;

@@ -1,4 +1,4 @@
-use super::color::Color;
+use super::{color::Color, interval::Interval};
 use rust_decimal::{Decimal, prelude::FromStr};
 
 pub struct Config {
@@ -7,6 +7,7 @@ pub struct Config {
     pub bullish_color: Color,
     pub bearish_color: Color,
     pub background_color: Color,
+    pub status_background_color: Color,
     pub text_color: Color,
     pub border_color: Color,
     pub current_price_color: Color,
@@ -21,6 +22,8 @@ pub struct Config {
 
     pub px_per_tick_choices: Vec<Decimal>,
     pub px_per_tick_initial: Decimal,
+
+    pub candle_interval_initial: Interval,
 }
 
 impl Default for Config {
@@ -31,6 +34,7 @@ impl Default for Config {
             bullish_color: Color::GREEN,
             bearish_color: Color::RED,
             background_color: Color::WHITE,
+            status_background_color: Color::new(255, 220, 220, 220),
             text_color: Color::BLACK,
             border_color: Color::BLACK,
             current_price_color: Color::GRAY,
@@ -61,6 +65,7 @@ impl Default for Config {
                 Decimal::from_str("21").unwrap(),
             ],
             px_per_tick_initial: Decimal::from_str("1").unwrap(),
+            candle_interval_initial: Interval::M5,
         }
     }
 }
