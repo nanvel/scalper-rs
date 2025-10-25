@@ -187,21 +187,15 @@ fn main() {
             size_base = size_base_3;
         }
 
-        if window.is_key_pressed(Key::X, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
-        {
+        if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
             rt.block_on(trader.buy(&client, &symbol, size_base))
         }
 
-        if window.is_key_pressed(Key::Z, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
-        {
+        if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
             rt.block_on(trader.sell(&client, &symbol, size_base))
         }
 
-        if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
-        {
+        if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
             rt.block_on(trader.flat(&client, &symbol))
         }
 
