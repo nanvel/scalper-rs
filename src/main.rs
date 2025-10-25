@@ -98,6 +98,8 @@ fn main() {
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
     let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
+    let mut size_range = Decimal::ZERO;
+
     let (mut handle, mut stop_tx) = listen_streams(
         shared_candles_state.clone(),
         shared_dom_state.clone(),
@@ -126,6 +128,7 @@ fn main() {
 
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
+    let mut force_redraw = true;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let current_center = shared_dom_state.read().unwrap().center() {
             if center.is_some() {
@@ -157,13 +160,17 @@ fn main() {
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_out()
+            px_per_tick.scale_out();
+            size_range = Decimal::ZERO;
+            force_redraw = true;
         }
 
         if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_in()
+            px_per_tick.scale_in();
+            size_range = Decimal::ZERO;
+            force_redraw = true;
         }
 
         if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)
@@ -186,6 +193,7 @@ fn main() {
                 handle = new_handle;
                 stop_tx = new_stop;
                 center = None;
+                force_redraw = true;
             }
         }
 
@@ -209,6 +217,7 @@ fn main() {
                 handle = new_handle;
                 stop_tx = new_stop;
                 center = None;
+                force_redraw = true;
             }
         }
 
@@ -224,6 +233,7 @@ fn main() {
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                force_redraw,
             );
             dom_renderer.render(
                 shared_dom_state.read().unwrap(),
@@ -232,6 +242,8 @@ fn main() {
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                &mut size_range,
+                force_redraw,
             );
             order_flow_renderer.render(
                 shared_order_flow_state.read().unwrap(),
@@ -240,6 +252,8 @@ fn main() {
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                &mut size_range,
+                force_redraw,
             );
         }
         status_renderer.render(interval, &mut dt, &text_renderer, &color_schema);
@@ -248,6 +262,8 @@ fn main() {
         window
             .update_with_buffer(&pixels_buffer, window_width, window_height)
             .unwrap();
+
+        force_redraw = false;
     }
 
     let _ = stop_tx.send(());

@@ -33,10 +33,13 @@ impl CandlesRenderer {
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
+        force_redraw: bool,
     ) {
-        if let Some(last_updated) = self.last_updated {
-            if last_updated == candles_state.updated {
-                return;
+        if !force_redraw {
+            if let Some(last_updated) = self.last_updated {
+                if last_updated == candles_state.updated {
+                    return;
+                }
             }
         }
         self.last_updated = Some(candles_state.updated);
@@ -257,7 +260,7 @@ impl CandlesRenderer {
         text_renderer.draw(
             dt,
             &tick_price.to_string(),
-            self.area.width - 50,
+            self.area.width - 60,
             price_to_y(tick_price) + 4,
             14,
             color_schema.text_light,
@@ -284,7 +287,7 @@ impl CandlesRenderer {
             text_renderer.draw(
                 dt,
                 &tp.to_string(),
-                self.area.width - 50,
+                self.area.width - 60,
                 price_to_y(tp) + 4,
                 14,
                 color_schema.text_light,
@@ -296,7 +299,7 @@ impl CandlesRenderer {
             text_renderer.draw(
                 dt,
                 &tp.to_string(),
-                self.area.width - 50,
+                self.area.width - 60,
                 price_to_y(tp) + 4,
                 14,
                 color_schema.text_light,
@@ -322,6 +325,15 @@ impl CandlesRenderer {
                 ..Default::default()
             },
             &DrawOptions::new(),
+        );
+
+        text_renderer.draw(
+            dt,
+            &current_price.to_string(),
+            self.area.width - 120,
+            price_to_y(current_price) - 2,
+            14,
+            color_schema.text_light,
         );
     }
 }

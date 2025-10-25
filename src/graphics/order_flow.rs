@@ -27,10 +27,14 @@ impl OrderFlowRenderer {
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
+        size_range: &mut Decimal,
+        force_redraw: bool,
     ) {
-        if let Some(last_updated) = self.last_updated {
-            if last_updated == of_state.updated {
-                return;
+        if !force_redraw {
+            if let Some(last_updated) = self.last_updated {
+                if last_updated == of_state.updated {
+                    return;
+                }
             }
         }
         self.last_updated = Some(of_state.updated);
@@ -78,11 +82,14 @@ impl OrderFlowRenderer {
             .cloned()
             .max()
             .unwrap_or(Decimal::ZERO)
-            .max(sell_buckets.iter().cloned().max().unwrap_or(Decimal::ZERO));
+            .max(sell_buckets.iter().cloned().max().unwrap_or(Decimal::ZERO))
+            .max(*size_range);
 
         if max_val.is_zero() {
             return;
         }
+
+        *size_range = max_val;
 
         for (i, val) in buy_buckets.iter().enumerate() {
             if val.is_zero() {
