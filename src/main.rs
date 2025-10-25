@@ -4,7 +4,7 @@ mod models;
 mod use_cases;
 
 use binance::api::load_symbol;
-use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer};
+use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, Window, WindowOptions};
 use models::{
     CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
@@ -112,6 +112,11 @@ fn main() {
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
+    let text_renderer =
+        TextRenderer::new("/System/Library/Fonts/SFNSMono.ttf").unwrap_or_else(|err| {
+            eprintln!("Error loading font: {}", err);
+            std::process::exit(1);
+        });
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
     let mut dom_renderer = DomRenderer::new(layout.dom_area);
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
@@ -214,6 +219,7 @@ fn main() {
                 shared_candles_state.read().unwrap(),
                 shared_open_interest_state.read().unwrap(),
                 &mut dt,
+                &text_renderer,
                 &color_schema,
                 symbol.tick_size,
                 center_price,
@@ -236,7 +242,7 @@ fn main() {
                 px_per_tick.get(),
             );
         }
-        status_renderer.render(interval, &mut dt, &color_schema);
+        status_renderer.render(interval, &mut dt, &text_renderer, &color_schema);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
