@@ -8,7 +8,7 @@ use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, 
 use minifb::{Key, Window, WindowOptions};
 use models::{
     CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
-    OrderFlowState, PxPerTick,
+    OrderFlowState, PxPerTick, Trader,
 };
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
@@ -70,6 +70,7 @@ fn main() {
         .expect("failed to build tokio runtime");
 
     let client = BinanceClient::new(config.binance_access_key, config.binance_secret_key);
+    let mut trader = Trader::new();
 
     let symbol_slug = &args[1];
     let symbol = rt
@@ -78,6 +79,16 @@ fn main() {
             eprintln!("Error loading symbol {}: {}", symbol_slug, err);
             std::process::exit(1);
         });
+    let ticker_price = rt
+        .block_on(client.get_ticker_price(&symbol_slug))
+        .unwrap_or_else(|err| {
+            eprintln!("Error loading ticker price for {}: {}", symbol_slug, err);
+            std::process::exit(1);
+        });
+
+    let size_base_1 = symbol.tune_quantity(config.size_1.unwrap() / ticker_price, ticker_price);
+    let size_base_2 = symbol.tune_quantity(config.size_2.unwrap() / ticker_price, ticker_price);
+    let size_base_3 = symbol.tune_quantity(config.size_3.unwrap() / ticker_price, ticker_price);
 
     let mut window_width = 800;
     let mut window_height = 600;
@@ -102,6 +113,7 @@ fn main() {
 
     let mut size_range = Decimal::ZERO;
     let mut size = config.size_1.unwrap();
+    let mut size_base = size_base_1;
 
     let (mut handle, mut stop_tx) = listen_streams(
         shared_candles_state.clone(),
@@ -162,14 +174,36 @@ fn main() {
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
             size = config.size_1.unwrap();
+            size_base = size_base_1;
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
             size = config.size_2.unwrap();
+            size_base = size_base_2;
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
             size = config.size_3.unwrap();
+            size_base = size_base_3;
+        }
+
+        if window.is_key_pressed(Key::X, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        {
+            rt.block_on(trader.buy(&client, &symbol, size_base))
+        }
+
+        if window.is_key_pressed(Key::X, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
+        {
+            rt.block_on(trader.sell(&client, &symbol, size_base))
+        }
+
+        if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        {
+            rt.block_on(trader.flat(&client, &symbol))
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -271,7 +305,14 @@ fn main() {
                 force_redraw,
             );
         }
-        status_renderer.render(interval, size, &mut dt, &text_renderer, &color_schema);
+        status_renderer.render(
+            interval,
+            size,
+            &mut dt,
+            &text_renderer,
+            &color_schema,
+            trader.pnl(),
+        );
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window

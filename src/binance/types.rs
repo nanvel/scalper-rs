@@ -1,3 +1,4 @@
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]
@@ -19,6 +20,16 @@ pub enum Filter {
     PriceFilter {
         #[serde(rename = "tickSize")]
         tick_size: String,
+    },
+    #[serde(rename = "MIN_NOTIONAL")]
+    MinNotional {
+        #[serde(rename = "notional")]
+        notional: String,
+    },
+    #[serde(rename = "LOT_SIZE")]
+    LotSize {
+        #[serde(rename = "stepSize")]
+        step_size: String,
     },
     #[serde(other)]
     Other,
@@ -57,11 +68,13 @@ pub struct Order {
     #[serde(rename = "origQty")]
     pub orig_qty: String,
     #[serde(rename = "executedQty")]
-    pub executed_qty: String,
+    pub executed_qty: Decimal,
     pub status: String,
     #[serde(rename = "type")]
-    pub order_type: String,
-    pub side: String,
+    pub order_type: OrderType,
+    pub side: OrderSide,
+    #[serde(rename = "avgPrice")]
+    pub avg_price: Decimal,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -108,4 +121,9 @@ pub enum TimeInForce {
 pub struct ApiError {
     pub code: i32,
     pub msg: String,
+}
+
+#[derive(serde::Deserialize)]
+pub struct TickerPriceResponse {
+    pub price: Decimal,
 }

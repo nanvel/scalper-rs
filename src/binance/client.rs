@@ -1,8 +1,11 @@
 use super::auth::{build_signed_query, get_timestamp};
 use super::errors::{BinanceError, Result};
-use super::types::{AccountInfo, ApiError, ExchangeInfo, Filter, Order, OrderRequest};
+use super::types::{
+    AccountInfo, ApiError, ExchangeInfo, Filter, Order, OrderRequest, TickerPriceResponse,
+};
 use crate::models::Symbol;
 use reqwest::{Client, Response};
+use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use std::collections::HashMap;
 
@@ -176,18 +179,40 @@ impl BinanceClient {
         self.get_public("/fapi/v1/ping", None).await
     }
 
+    pub async fn get_ticker_price(&self, symbol: &str) -> Result<Decimal> {
+        let response: TickerPriceResponse = self
+            .get_public(&format!("/fapi/v2/ticker/price?symbol={}", symbol), None)
+            .await?;
+        Ok(response.price)
+    }
+
     pub async fn get_symbol(&self, symbol: &str) -> Result<Symbol> {
         let exchange_info: ExchangeInfo = self.get_public("/fapi/v1/exchangeInfo", None).await?;
         for sym in exchange_info.symbols {
             if sym.symbol.eq_ignore_ascii_case(symbol) {
+                let mut t_s = Decimal::ZERO;
+                let mut s_s = Decimal::ZERO;
+                let mut n = Decimal::ZERO;
                 for filter in sym.filters {
-                    if let Filter::PriceFilter { tick_size } = filter {
-                        return Ok(Symbol {
-                            tick_size: tick_size.parse().unwrap(),
-                            slug: sym.symbol,
-                        });
+                    match filter {
+                        Filter::PriceFilter { tick_size } => {
+                            t_s = tick_size.parse().unwrap();
+                        }
+                        Filter::MinNotional { notional } => {
+                            n = notional.parse().unwrap();
+                        }
+                        Filter::LotSize { step_size } => {
+                            s_s = step_size.parse().unwrap();
+                        }
+                        _ => {}
                     }
                 }
+                return Ok(Symbol {
+                    tick_size: t_s,
+                    step_size: s_s,
+                    notional: n,
+                    slug: sym.symbol,
+                });
             }
         }
         Err(BinanceError::ParseError("Symbol not found".to_string()))

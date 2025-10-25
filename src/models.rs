@@ -10,6 +10,7 @@ mod order_flow;
 mod px_per_tick;
 mod symbol;
 mod timestamp;
+mod trader;
 
 pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use color::Color;
@@ -23,3 +24,4 @@ pub use order_flow::{OrderFlowState, SharedOrderFlowState};
 pub use px_per_tick::PxPerTick;
 pub use symbol::Symbol;
 pub use timestamp::Timestamp;
+pub use trader::Trader;

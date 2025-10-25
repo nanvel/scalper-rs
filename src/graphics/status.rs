@@ -20,6 +20,7 @@ impl StatusRenderer {
         dt: &mut DrawTarget,
         text_renderer: &TextRenderer,
         color_schema: &ColorSchema,
+        pnl: Decimal,
     ) {
         dt.fill_rect(
             self.area.left as f32,
@@ -43,6 +44,15 @@ impl StatusRenderer {
             dt,
             &(size.to_string() + "$"),
             self.area.left + self.padding * 2 + 25,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+
+        text_renderer.draw(
+            dt,
+            &pnl.to_string(),
+            self.area.left + self.area.width - 50,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,
