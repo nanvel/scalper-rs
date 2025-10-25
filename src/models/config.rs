@@ -1,9 +1,13 @@
+use super::color_schema::Theme;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    #[serde(default)]
+    pub theme: Theme,
+
     pub binance_access_key: Option<String>,
     pub binance_secret_key: Option<String>,
 }

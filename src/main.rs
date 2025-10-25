@@ -72,8 +72,10 @@ fn main() {
             std::process::exit(1);
         });
 
-    let config = Config::load();
-    let color_schema = ColorSchema::dark();
+    let config = Config::load().unwrap_or_else(|err| {
+        eprintln!("Error loading config: {}", err);
+        std::process::exit(1);
+    });
 
     let mut window_width = 800;
     let mut window_height = 600;
@@ -204,6 +206,8 @@ fn main() {
                 center = None;
             }
         }
+
+        let color_schema = ColorSchema::for_theme(config.theme);
 
         if let Some(center_price) = center {
             candles_renderer.render(

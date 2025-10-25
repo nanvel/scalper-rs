@@ -1,7 +1,23 @@
 use crate::models::Color;
+use chrono::{Local, Timelike};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum Theme {
+    Light,
+    Dark,
+    Auto,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Theme::Dark
+    }
+}
 
 pub struct ColorSchema {
-    pub name: String,
+    pub theme: Theme,
 
     pub background: Color,
     pub status_bar_background: Color,
@@ -27,7 +43,7 @@ pub struct ColorSchema {
 impl ColorSchema {
     pub fn dark() -> Self {
         Self {
-            name: "Dark".to_string(),
+            theme: Theme::Dark,
 
             // Base colors
             background: Color::new(17, 24, 39, 255), // #111827
@@ -61,7 +77,7 @@ impl ColorSchema {
 
     pub fn light() -> Self {
         Self {
-            name: "Default".to_string(),
+            theme: Theme::Light,
 
             // Base colors
             background: Color::new(255, 255, 255, 255), // #FFFFFF
@@ -92,10 +108,19 @@ impl ColorSchema {
             scale_bar: Color::new(139, 92, 246, 255), // #8B5CF6
         }
     }
-}
 
-impl Default for ColorSchema {
-    fn default() -> Self {
-        Self::light()
+    pub fn for_theme(theme: Theme) -> Self {
+        match theme {
+            Theme::Light => Self::light(),
+            Theme::Dark => Self::dark(),
+            Theme::Auto => {
+                let hour = Local::now().hour();
+                if hour >= 20 || hour < 6 {
+                    Self::dark()
+                } else {
+                    Self::light()
+                }
+            }
+        }
     }
 }
