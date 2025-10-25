@@ -1,4 +1,5 @@
 use super::color_schema::Theme;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -10,6 +11,17 @@ pub struct Config {
 
     pub binance_access_key: Option<String>,
     pub binance_secret_key: Option<String>,
+
+    #[serde(default = "default_size")]
+    pub size_1: Option<Decimal>,
+    #[serde(default = "default_size")]
+    pub size_2: Option<Decimal>,
+    #[serde(default = "default_size")]
+    pub size_3: Option<Decimal>,
+}
+
+fn default_size() -> Option<Decimal> {
+    Some(Decimal::from(100))
 }
 
 impl Config {

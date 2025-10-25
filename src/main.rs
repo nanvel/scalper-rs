@@ -101,6 +101,7 @@ fn main() {
     let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
     let mut size_range = Decimal::ZERO;
+    let mut size = config.size_1.unwrap();
 
     let (mut handle, mut stop_tx) = listen_streams(
         shared_candles_state.clone(),
@@ -157,6 +158,18 @@ fn main() {
                 order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
                 status_renderer = StatusRenderer::new(layout.status_area);
             }
+        }
+
+        if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
+            size = config.size_1.unwrap();
+        }
+
+        if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
+            size = config.size_2.unwrap();
+        }
+
+        if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
+            size = config.size_3.unwrap();
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -258,7 +271,7 @@ fn main() {
                 force_redraw,
             );
         }
-        status_renderer.render(interval, &mut dt, &text_renderer, &color_schema);
+        status_renderer.render(interval, size, &mut dt, &text_renderer, &color_schema);
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window

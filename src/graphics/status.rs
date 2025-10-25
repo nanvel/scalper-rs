@@ -1,8 +1,7 @@
 use super::text::TextRenderer;
 use crate::models::{Area, ColorSchema, Interval};
-use font_kit::font::Font;
-use raqote::{DrawOptions, DrawTarget, Point, Source};
-use std::fs;
+use raqote::{DrawOptions, DrawTarget, Source};
+use rust_decimal::Decimal;
 
 pub struct StatusRenderer {
     area: Area,
@@ -17,6 +16,7 @@ impl StatusRenderer {
     pub fn render(
         &self,
         interval: Interval,
+        size: Decimal,
         dt: &mut DrawTarget,
         text_renderer: &TextRenderer,
         color_schema: &ColorSchema,
@@ -34,6 +34,15 @@ impl StatusRenderer {
             dt,
             interval.slug(),
             self.area.left + self.padding * 2,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+
+        text_renderer.draw(
+            dt,
+            &(size.to_string() + "$"),
+            self.area.left + self.padding * 2 + 25,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,

@@ -1,6 +1,6 @@
 use super::auth::{build_signed_query, get_timestamp};
 use super::errors::{BinanceError, Result};
-use super::types::{AccountInfo, ApiError, ExchangeInfo, Filter, Order, OrderRequest, SymbolInfo};
+use super::types::{AccountInfo, ApiError, ExchangeInfo, Filter, Order, OrderRequest};
 use crate::models::Symbol;
 use reqwest::{Client, Response};
 use serde::de::DeserializeOwned;
@@ -34,7 +34,6 @@ impl BinanceClient {
                 BinanceError::ParseError(format!("Failed to parse response: {}. Body: {}", e, text))
             })
         } else {
-            // Try to parse as API error
             if let Ok(api_error) = serde_json::from_str::<ApiError>(&text) {
                 Err(BinanceError::ApiError {
                     code: api_error.code,
@@ -69,7 +68,6 @@ impl BinanceClient {
         self.handle_response(response).await
     }
 
-    /// Make GET request to signed endpoint (requires auth)
     async fn get_signed<T: DeserializeOwned>(
         &self,
         endpoint: &str,
@@ -104,7 +102,6 @@ impl BinanceClient {
         self.handle_response(response).await
     }
 
-    /// Make POST request to signed endpoint (requires auth)
     async fn post_signed<T: DeserializeOwned>(
         &self,
         endpoint: &str,
@@ -139,7 +136,6 @@ impl BinanceClient {
         self.handle_response(response).await
     }
 
-    /// Make DELETE request to signed endpoint (requires auth)
     async fn delete_signed<T: DeserializeOwned>(
         &self,
         endpoint: &str,

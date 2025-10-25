@@ -1,8 +1,7 @@
 use super::text::TextRenderer;
 use crate::models::{Area, CandlesState, ColorSchema, OpenInterestState, Timestamp};
 use raqote::{
-    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, SolidSource, Source,
-    StrokeStyle,
+    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
