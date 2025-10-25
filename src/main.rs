@@ -3,7 +3,7 @@ mod graphics;
 mod models;
 mod use_cases;
 
-use binance::api::load_symbol;
+use binance::BinanceClient;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, Window, WindowOptions};
 use models::{
@@ -58,24 +58,26 @@ fn main() {
         std::process::exit(1);
     }
 
+    let config = Config::load().unwrap_or_else(|err| {
+        eprintln!("Error loading config: {}", err);
+        std::process::exit(1);
+    });
+
     let rt = runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
         .build()
         .expect("failed to build tokio runtime");
 
+    let client = BinanceClient::new(config.binance_access_key, config.binance_secret_key);
+
     let symbol_slug = &args[1];
     let symbol = rt
-        .block_on(load_symbol(&symbol_slug))
+        .block_on(client.get_symbol(&symbol_slug))
         .unwrap_or_else(|err| {
             eprintln!("Error loading symbol {}: {}", symbol_slug, err);
             std::process::exit(1);
         });
-
-    let config = Config::load().unwrap_or_else(|err| {
-        eprintln!("Error loading config: {}", err);
-        std::process::exit(1);
-    });
 
     let mut window_width = 800;
     let mut window_height = 600;
