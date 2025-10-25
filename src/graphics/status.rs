@@ -1,7 +1,7 @@
-use crate::models::{Area, Config, Interval};
-use font_kit::font::Font;
-use raqote::{DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, Source, StrokeStyle};
-use std::fs;
+use super::text::TextRenderer;
+use crate::models::{Area, ColorSchema, Interval};
+use raqote::{DrawOptions, DrawTarget, Source};
+use rust_decimal::Decimal;
 
 pub struct StatusRenderer {
     area: Area,
@@ -13,31 +13,58 @@ impl StatusRenderer {
         Self { area, padding: 2 }
     }
 
-    pub fn render(&self, interval: Interval, dt: &mut DrawTarget, config: &Config) {
+    pub fn render(
+        &self,
+        interval: Interval,
+        size: Decimal,
+        dt: &mut DrawTarget,
+        text_renderer: &TextRenderer,
+        color_schema: &ColorSchema,
+        pnl: Decimal,
+        balance: Decimal,
+    ) {
         dt.fill_rect(
             self.area.left as f32,
             self.area.top as f32,
             self.area.width as f32,
             self.area.height as f32,
-            &Source::Solid(config.status_background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
-        let font_data = fs::read("/System/Library/Fonts/SFNSMono.ttf".to_string())
-            .expect("Failed to read font file");
-        let font = Font::from_bytes(font_data.into(), 0).expect("Failed to load font");
-        let text_height = self.area.height - self.padding * 2;
-
-        dt.draw_text(
-            &font,
-            (text_height * 72 / 96) as f32,
+        text_renderer.draw(
+            dt,
             interval.slug(),
-            Point::new(
-                (self.area.left + self.padding * 2) as f32,
-                (self.area.top + self.area.height / 2 + self.padding * 2) as f32,
-            ),
-            &Source::Solid(config.text_color.into()),
-            &DrawOptions::new(),
+            self.area.left + self.padding * 2,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+
+        text_renderer.draw(
+            dt,
+            &(size.to_string() + "$"),
+            self.area.left + self.padding * 2 + 25,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+
+        text_renderer.draw(
+            dt,
+            &pnl.to_string(),
+            self.area.left + self.area.width - 100,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+        text_renderer.draw(
+            dt,
+            &balance.to_string(),
+            self.area.left + self.area.width - 200,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
         );
     }
 }

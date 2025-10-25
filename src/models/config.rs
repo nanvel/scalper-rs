@@ -1,71 +1,53 @@
-use super::{color::Color, interval::Interval};
-use rust_decimal::{Decimal, prelude::FromStr};
+use super::color_schema::Theme;
+use rust_decimal::Decimal;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
 
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub online_color: Color,
-    pub offline_color: Color,
-    pub bullish_color: Color,
-    pub bearish_color: Color,
-    pub background_color: Color,
-    pub status_background_color: Color,
-    pub text_color: Color,
-    pub border_color: Color,
-    pub current_price_color: Color,
-    pub bid_color: Color,
-    pub ask_color: Color,
+    #[serde(default)]
+    pub theme: Theme,
 
-    pub dom_width: i32,
-    pub order_flow_width: i32,
-    pub status_height: i32,
-    pub row_height: i32,
-    pub border_width: i32,
+    pub binance_access_key: Option<String>,
+    pub binance_secret_key: Option<String>,
 
-    pub px_per_tick_choices: Vec<Decimal>,
-    pub px_per_tick_initial: Decimal,
-
-    pub candle_interval_initial: Interval,
+    #[serde(default = "default_size")]
+    pub size_1: Option<Decimal>,
+    #[serde(default = "default_size")]
+    pub size_2: Option<Decimal>,
+    #[serde(default = "default_size")]
+    pub size_3: Option<Decimal>,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            online_color: Color::GREEN,
-            offline_color: Color::RED,
-            bullish_color: Color::GREEN,
-            bearish_color: Color::RED,
-            background_color: Color::WHITE,
-            status_background_color: Color::new(255, 220, 220, 220),
-            text_color: Color::BLACK,
-            border_color: Color::BLACK,
-            current_price_color: Color::GRAY,
-            bid_color: Color::GREEN.with_alpha(128),
-            ask_color: Color::RED.with_alpha(128),
-            dom_width: 100,
-            order_flow_width: 100,
-            status_height: 20,
-            row_height: 10,
-            border_width: 1,
-            px_per_tick_choices: vec![
-                Decimal::from_str("0.01").unwrap(),
-                Decimal::from_str("0.02").unwrap(),
-                Decimal::from_str("0.05").unwrap(),
-                Decimal::from_str("0.1").unwrap(),
-                Decimal::from_str("0.2").unwrap(),
-                Decimal::from_str("0.5").unwrap(),
-                Decimal::from_str("1").unwrap(),
-                Decimal::from_str("3").unwrap(),
-                Decimal::from_str("5").unwrap(),
-                Decimal::from_str("7").unwrap(),
-                Decimal::from_str("9").unwrap(),
-                Decimal::from_str("11").unwrap(),
-                Decimal::from_str("13").unwrap(),
-                Decimal::from_str("15").unwrap(),
-                Decimal::from_str("17").unwrap(),
-                Decimal::from_str("19").unwrap(),
-                Decimal::from_str("21").unwrap(),
-            ],
-            px_per_tick_initial: Decimal::from_str("1").unwrap(),
-            candle_interval_initial: Interval::M5,
-        }
+fn default_size() -> Option<Decimal> {
+    Some(Decimal::from(100))
+}
+
+impl Config {
+    pub fn load() -> Result<Self, Box<dyn std::error::Error>> {
+        let config_path = Self::config_path()?;
+
+        let contents = match fs::read_to_string(&config_path) {
+            Ok(c) => c,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => String::new(),
+            Err(err) => {
+                return Err(format!(
+                    "Failed to read config file at {}: {}",
+                    config_path.display(),
+                    err
+                )
+                .into());
+            }
+        };
+
+        let config: Config = toml::from_str(&contents)?;
+
+        Ok(config)
+    }
+
+    fn config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let home = dirs::home_dir().ok_or("No home directory.")?;
+        Ok(home.join(".scalper").join("config"))
     }
 }

@@ -3,11 +3,12 @@ mod graphics;
 mod models;
 mod use_cases;
 
-use binance::api::load_symbol;
-use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer};
+use binance::BinanceClient;
+use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, Window, WindowOptions};
 use models::{
-    CandlesState, Config, DomState, Interval, Layout, OpenInterestState, OrderFlowState, PxPerTick,
+    CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
+    OrderFlowState, PxPerTick, Trader,
 };
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
@@ -57,21 +58,37 @@ fn main() {
         std::process::exit(1);
     }
 
+    let config = Config::load().unwrap_or_else(|err| {
+        eprintln!("Error loading config: {}", err);
+        std::process::exit(1);
+    });
+
     let rt = runtime::Builder::new_multi_thread()
         .worker_threads(1)
         .enable_all()
         .build()
         .expect("failed to build tokio runtime");
 
+    let client = BinanceClient::new(config.binance_access_key, config.binance_secret_key);
+    let mut trader = Trader::new();
+
     let symbol_slug = &args[1];
     let symbol = rt
-        .block_on(load_symbol(&symbol_slug))
+        .block_on(client.get_symbol(&symbol_slug))
         .unwrap_or_else(|err| {
             eprintln!("Error loading symbol {}: {}", symbol_slug, err);
             std::process::exit(1);
         });
+    let ticker_price = rt
+        .block_on(client.get_ticker_price(&symbol_slug))
+        .unwrap_or_else(|err| {
+            eprintln!("Error loading ticker price for {}: {}", symbol_slug, err);
+            std::process::exit(1);
+        });
 
-    let config = Config::default();
+    let size_base_1 = symbol.tune_quantity(config.size_1.unwrap() / ticker_price, ticker_price);
+    let size_base_2 = symbol.tune_quantity(config.size_2.unwrap() / ticker_price, ticker_price);
+    let size_base_3 = symbol.tune_quantity(config.size_3.unwrap() / ticker_price, ticker_price);
 
     let mut window_width = 800;
     let mut window_height = 600;
@@ -87,12 +104,16 @@ fn main() {
     )
     .unwrap();
 
-    let mut interval = config.candle_interval_initial;
+    let mut interval = Interval::M5;
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
     let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
+
+    let mut size_range = Decimal::ZERO;
+    let mut size = config.size_1.unwrap();
+    let mut size_base = size_base_1;
 
     let (mut handle, mut stop_tx) = listen_streams(
         shared_candles_state.clone(),
@@ -107,7 +128,12 @@ fn main() {
     listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
-    let mut layout = Layout::new(window_width as i32, window_height as i32, &config);
+    let mut layout = Layout::new(window_width as i32, window_height as i32);
+    let text_renderer =
+        TextRenderer::new("/System/Library/Fonts/SFNSMono.ttf").unwrap_or_else(|err| {
+            eprintln!("Error loading font: {}", err);
+            std::process::exit(1);
+        });
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
     let mut dom_renderer = DomRenderer::new(layout.dom_area);
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
@@ -116,10 +142,8 @@ fn main() {
     window.set_target_fps(60);
 
     let mut center: Option<Decimal> = None;
-    let mut px_per_tick = PxPerTick::new(
-        config.px_per_tick_initial,
-        config.px_per_tick_choices.clone(),
-    );
+    let mut px_per_tick = PxPerTick::default();
+    let mut force_redraw = true;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         if let current_center = shared_dom_state.read().unwrap().center() {
             if center.is_some() {
@@ -140,7 +164,7 @@ fn main() {
                 window_height = new_height;
 
                 dt = DrawTarget::new(window_width as i32, window_height as i32);
-                layout = Layout::new(window_width as i32, window_height as i32, &config);
+                layout = Layout::new(window_width as i32, window_height as i32);
                 candles_renderer = CandlesRenderer::new(layout.candles_area);
                 dom_renderer = DomRenderer::new(layout.dom_area);
                 order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
@@ -148,24 +172,53 @@ fn main() {
             }
         }
 
-        if let Some((_, scroll_y)) = window.get_scroll_wheel() {
-            if scroll_y > 0.0 {
-                px_per_tick.scale_in()
-            } else if scroll_y < 0.0 {
-                px_per_tick.scale_out()
-            }
+        if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
+            size = config.size_1.unwrap();
+            size_base = size_base_1;
+        }
+
+        if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
+            size = config.size_2.unwrap();
+            size_base = size_base_2;
+        }
+
+        if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
+            size = config.size_3.unwrap();
+            size_base = size_base_3;
+        }
+
+        if window.is_key_pressed(Key::X, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        {
+            rt.block_on(trader.buy(&client, &symbol, size_base))
+        }
+
+        if window.is_key_pressed(Key::Z, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        {
+            rt.block_on(trader.sell(&client, &symbol, size_base))
+        }
+
+        if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No)
+            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        {
+            rt.block_on(trader.flat(&client, &symbol))
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_out()
+            px_per_tick.scale_out();
+            size_range = Decimal::ZERO;
+            force_redraw = true;
         }
 
         if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
-            px_per_tick.scale_in()
+            px_per_tick.scale_in();
+            size_range = Decimal::ZERO;
+            force_redraw = true;
         }
 
         if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)
@@ -188,6 +241,7 @@ fn main() {
                 handle = new_handle;
                 stop_tx = new_stop;
                 center = None;
+                force_redraw = true;
             }
         }
 
@@ -211,42 +265,64 @@ fn main() {
                 handle = new_handle;
                 stop_tx = new_stop;
                 center = None;
+                force_redraw = true;
             }
         }
+
+        let color_schema = ColorSchema::for_theme(config.theme);
 
         if let Some(center_price) = center {
             candles_renderer.render(
                 shared_candles_state.read().unwrap(),
                 shared_open_interest_state.read().unwrap(),
                 &mut dt,
-                &config,
+                &text_renderer,
+                &color_schema,
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                force_redraw,
             );
             dom_renderer.render(
                 shared_dom_state.read().unwrap(),
                 &mut dt,
-                &config,
+                &color_schema,
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                &mut size_range,
+                force_redraw,
             );
             order_flow_renderer.render(
                 shared_order_flow_state.read().unwrap(),
                 &mut dt,
-                &config,
+                &color_schema,
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                &mut size_range,
+                force_redraw,
             );
         }
-        status_renderer.render(interval, &mut dt, &config);
+        {
+            let dom_state = shared_dom_state.read().unwrap();
+            status_renderer.render(
+                interval,
+                size,
+                &mut dt,
+                &text_renderer,
+                &color_schema,
+                trader.pnl(dom_state.bid(), dom_state.ask()),
+                trader.base_balance(),
+            );
+        }
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
             .update_with_buffer(&pixels_buffer, window_width, window_height)
             .unwrap();
+
+        force_redraw = false;
     }
 
     let _ = stop_tx.send(());

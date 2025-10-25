@@ -1,12 +1,10 @@
-use crate::models::{Area, CandlesState, Color, Config, OpenInterestState, Timestamp};
-use font_kit::font::Font;
+use super::text::TextRenderer;
+use crate::models::{Area, CandlesState, ColorSchema, OpenInterestState, Timestamp};
 use raqote::{
-    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, SolidSource, Source,
-    StrokeStyle,
+    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use std::fs;
 use std::sync::RwLockReadGuard;
 
 pub struct CandlesRenderer {
@@ -29,14 +27,18 @@ impl CandlesRenderer {
         candles_state: RwLockReadGuard<CandlesState>,
         open_interest_state: RwLockReadGuard<OpenInterestState>,
         dt: &mut DrawTarget,
-        config: &Config,
+        text_renderer: &TextRenderer,
+        color_schema: &ColorSchema,
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
+        force_redraw: bool,
     ) {
-        if let Some(last_updated) = self.last_updated {
-            if last_updated == candles_state.updated {
-                return;
+        if !force_redraw {
+            if let Some(last_updated) = self.last_updated {
+                if last_updated == candles_state.updated {
+                    return;
+                }
             }
         }
         self.last_updated = Some(candles_state.updated);
@@ -46,7 +48,7 @@ impl CandlesRenderer {
             self.area.top as f32,
             self.area.width as f32,
             self.area.height as f32,
-            &Source::Solid(config.background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
@@ -94,9 +96,9 @@ impl CandlesRenderer {
             let low_y = price_to_y(candle.low);
 
             let color: SolidSource = if candle.is_bullish() {
-                config.bullish_color.into()
+                color_schema.bullish_candle.into()
             } else {
-                config.bearish_color.into()
+                color_schema.bearish_candle.into()
             };
 
             let mut pb = PathBuilder::new();
@@ -159,7 +161,7 @@ impl CandlesRenderer {
             (self.area.height - volume_height - 5) as f32,
             self.area.width as f32,
             (volume_height + 5) as f32,
-            &Source::Solid(config.background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
@@ -168,7 +170,7 @@ impl CandlesRenderer {
             (self.area.height - volume_height - 5) as f32,
             self.area.width as f32,
             1.,
-            &Source::Solid(config.border_color.into()),
+            &Source::Solid(color_schema.border.into()),
             &DrawOptions::new(),
         );
 
@@ -200,9 +202,9 @@ impl CandlesRenderer {
                 let bar_left = x - (body_width / 2);
 
                 let vol_color: SolidSource = if candle.is_bullish() {
-                    config.bullish_color.into()
+                    color_schema.bullish_candle.into()
                 } else {
-                    config.bearish_color.into()
+                    color_schema.bearish_candle.into()
                 };
 
                 let mut pb = PathBuilder::new();
@@ -216,7 +218,7 @@ impl CandlesRenderer {
                 let path = pb.finish();
                 dt.fill(
                     &path,
-                    &Source::Solid(Color::GRAY.into()),
+                    &Source::Solid(color_schema.open_interest.into()),
                     &DrawOptions::new(),
                 );
             }
@@ -237,7 +239,7 @@ impl CandlesRenderer {
             let path = pb.finish();
             dt.fill(
                 &path,
-                &Source::Solid(Color::BLUE.into()),
+                &Source::Solid(color_schema.scale_bar.into()),
                 &DrawOptions::new(),
             );
         }
@@ -254,17 +256,13 @@ impl CandlesRenderer {
         let m = Decimal::from(m) * tick_size;
         let tick_price = (center / m).floor() * m;
 
-        let font_data = fs::read("/System/Library/Fonts/SFNSMono.ttf".to_string())
-            .expect("Failed to read font file");
-        let font = Font::from_bytes(font_data.into(), 0).expect("Failed to load font");
-
-        dt.draw_text(
-            &font,
-            (14 * 72 / 96) as f32,
+        text_renderer.draw(
+            dt,
             &tick_price.to_string(),
-            Point::new((self.area.width - 50) as f32, price_to_y(tick_price) as f32),
-            &Source::Solid(config.text_color.into()),
-            &DrawOptions::new(),
+            self.area.width - 60,
+            price_to_y(tick_price) + 4,
+            14,
+            color_schema.text_light,
         );
 
         let mut pb = PathBuilder::new();
@@ -279,31 +277,31 @@ impl CandlesRenderer {
 
         dt.fill(
             &path,
-            &Source::Solid(Color::BLUE.into()),
+            &Source::Solid(color_schema.scale_bar.into()),
             &DrawOptions::new(),
         );
 
-        for i in 0..3 {
+        for i in 1..3 {
             let tp = tick_price + m * Decimal::from(i);
-            dt.draw_text(
-                &font,
-                (14 * 72 / 96) as f32,
+            text_renderer.draw(
+                dt,
                 &tp.to_string(),
-                Point::new((self.area.width - 50) as f32, price_to_y(tp) as f32),
-                &Source::Solid(config.text_color.into()),
-                &DrawOptions::new(),
+                self.area.width - 60,
+                price_to_y(tp) + 4,
+                14,
+                color_schema.text_light,
             );
         }
 
-        for i in 0..3 {
+        for i in 1..3 {
             let tp = tick_price - m * Decimal::from(i);
-            dt.draw_text(
-                &font,
-                (14 * 72 / 96) as f32,
+            text_renderer.draw(
+                dt,
                 &tp.to_string(),
-                Point::new((self.area.width - 50) as f32, price_to_y(tp) as f32),
-                &Source::Solid(config.text_color.into()),
-                &DrawOptions::new(),
+                self.area.width - 60,
+                price_to_y(tp) + 4,
+                14,
+                color_schema.text_light,
             );
         }
 
@@ -318,7 +316,7 @@ impl CandlesRenderer {
 
         dt.stroke(
             &path,
-            &Source::Solid(config.current_price_color.into()),
+            &Source::Solid(color_schema.crosshair.into()),
             &StrokeStyle {
                 width: 1.0,
                 cap: LineCap::Round,
@@ -327,30 +325,14 @@ impl CandlesRenderer {
             },
             &DrawOptions::new(),
         );
-    }
-}
 
-fn closest_significant(price: Decimal, lower: Decimal, upper: Decimal) -> Decimal {
-    let diff = upper - lower;
-    if diff <= Decimal::ZERO {
-        return price;
+        text_renderer.draw(
+            dt,
+            &current_price.to_string(),
+            self.area.width - 120,
+            price_to_y(current_price) - 2,
+            14,
+            color_schema.text_light,
+        );
     }
-    let diff_f = diff.to_f64().unwrap_or(0.0);
-    let magnitude = 10f64.powf(diff_f.log10().floor());
-    let steps = [1.0, 2.0, 5.0];
-    let mut best = price;
-    let mut min_dist = f64::MAX;
-    for step in steps {
-        let candidate =
-            (price.to_f64().unwrap_or(0.0) / (magnitude * step)).round() * magnitude * step;
-        if candidate >= lower.to_f64().unwrap_or(0.0) && candidate <= upper.to_f64().unwrap_or(0.0)
-        {
-            let dist = (candidate - price.to_f64().unwrap_or(0.0)).abs();
-            if dist < min_dist {
-                min_dist = dist;
-                best = Decimal::from_f64(candidate).unwrap();
-            }
-        }
-    }
-    best
 }

@@ -1,44 +1,47 @@
 use rust_decimal::Decimal;
-use std::time::{Duration, Instant};
+use rust_decimal::prelude::FromStr;
 
-pub struct PxPerTick {
-    value: Decimal,
-    choices: Vec<Decimal>,
-    change_ts: Instant,
+const PX_PER_TICK_CHOICES: [&str; 17] = [
+    "0.01", "0.02", "0.05", "0.1", "0.2", "0.5", "1", "3", "5", "7", "9", "11", "13", "15", "17",
+    "19", "21",
+];
+
+pub struct PxPerTick(Decimal);
+
+impl Default for PxPerTick {
+    fn default() -> Self {
+        Self(Decimal::from_str("1").unwrap())
+    }
 }
 
 impl PxPerTick {
-    pub fn new(value: Decimal, choices: Vec<Decimal>) -> Self {
-        Self {
-            value,
-            choices,
-            change_ts: Instant::now(),
-        }
+    pub fn new(value: Decimal) -> Self {
+        Self(value)
     }
 
     pub fn scale_in(&mut self) {
-        if Instant::now() - self.change_ts > Duration::from_millis(100) {
-            if let Some(pos) = self.choices.iter().position(|&x| x == self.value) {
-                if pos > 0 {
-                    self.value = self.choices[pos - 1];
-                }
+        if let Some(pos) = PX_PER_TICK_CHOICES
+            .iter()
+            .position(|&x| Decimal::from_str(x).unwrap() == self.0)
+        {
+            if pos > 0 {
+                self.0 = Decimal::from_str(PX_PER_TICK_CHOICES[pos - 1]).unwrap();
             }
-            self.change_ts = Instant::now();
         }
     }
 
     pub fn scale_out(&mut self) {
-        if Instant::now() - self.change_ts > Duration::from_millis(100) {
-            if let Some(pos) = self.choices.iter().position(|&x| x == self.value) {
-                if pos + 1 < self.choices.len() {
-                    self.value = self.choices[pos + 1];
-                }
+        if let Some(pos) = PX_PER_TICK_CHOICES
+            .iter()
+            .position(|&x| Decimal::from_str(x).unwrap() == self.0)
+        {
+            if pos + 1 < PX_PER_TICK_CHOICES.len() {
+                self.0 = Decimal::from_str(PX_PER_TICK_CHOICES[pos + 1]).unwrap();
             }
-            self.change_ts = Instant::now();
         }
     }
 
     pub fn get(&self) -> Decimal {
-        self.value
+        self.0
     }
 }

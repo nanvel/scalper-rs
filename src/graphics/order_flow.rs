@@ -1,4 +1,4 @@
-use crate::models::{Area, Config, OrderFlowState, Timestamp};
+use crate::models::{Area, ColorSchema, OrderFlowState, Timestamp};
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -23,14 +23,18 @@ impl OrderFlowRenderer {
         &mut self,
         of_state: RwLockReadGuard<OrderFlowState>,
         dt: &mut DrawTarget,
-        config: &Config,
+        color_schema: &ColorSchema,
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
+        size_range: &mut Decimal,
+        force_redraw: bool,
     ) {
-        if let Some(last_updated) = self.last_updated {
-            if last_updated == of_state.updated {
-                return;
+        if !force_redraw {
+            if let Some(last_updated) = self.last_updated {
+                if last_updated == of_state.updated {
+                    return;
+                }
             }
         }
         self.last_updated = Some(of_state.updated);
@@ -41,7 +45,7 @@ impl OrderFlowRenderer {
             self.area.top as f32,
             self.area.width as f32,
             self.area.height as f32,
-            &Source::Solid(config.background_color.into()),
+            &Source::Solid(color_schema.background.into()),
             &DrawOptions::new(),
         );
 
@@ -78,11 +82,14 @@ impl OrderFlowRenderer {
             .cloned()
             .max()
             .unwrap_or(Decimal::ZERO)
-            .max(sell_buckets.iter().cloned().max().unwrap_or(Decimal::ZERO));
+            .max(sell_buckets.iter().cloned().max().unwrap_or(Decimal::ZERO))
+            .max(*size_range);
 
         if max_val.is_zero() {
             return;
         }
+
+        *size_range = max_val;
 
         for (i, val) in buy_buckets.iter().enumerate() {
             if val.is_zero() {
@@ -97,7 +104,7 @@ impl OrderFlowRenderer {
                     y - 1.0,
                     width,
                     3.0,
-                    &Source::Solid(config.bid_color.into()),
+                    &Source::Solid(color_schema.volume_buy.into()),
                     &DrawOptions::new(),
                 );
             } else if px_per_tick >= Decimal::from(5) {
@@ -106,7 +113,7 @@ impl OrderFlowRenderer {
                     y - (px_per_tick.to_f32().unwrap() / 2.0).floor(),
                     width,
                     px_per_tick.to_f32().unwrap() - 2.0,
-                    &Source::Solid(config.bid_color.into()),
+                    &Source::Solid(color_schema.volume_buy.into()),
                     &DrawOptions::new(),
                 );
             } else {
@@ -115,7 +122,7 @@ impl OrderFlowRenderer {
                     y,
                     width,
                     1.0,
-                    &Source::Solid(config.bid_color.into()),
+                    &Source::Solid(color_schema.volume_buy.into()),
                     &DrawOptions::new(),
                 );
             }
@@ -134,7 +141,7 @@ impl OrderFlowRenderer {
                     y - 1.0,
                     width,
                     3.0,
-                    &Source::Solid(config.ask_color.into()),
+                    &Source::Solid(color_schema.volume_sell.into()),
                     &DrawOptions::new(),
                 );
             } else if px_per_tick >= Decimal::from(5) {
@@ -143,7 +150,7 @@ impl OrderFlowRenderer {
                     y - (px_per_tick.to_f32().unwrap() / 2.0).floor(),
                     width,
                     px_per_tick.to_f32().unwrap() - 2.0,
-                    &Source::Solid(config.ask_color.into()),
+                    &Source::Solid(color_schema.volume_sell.into()),
                     &DrawOptions::new(),
                 );
             } else {
@@ -152,7 +159,7 @@ impl OrderFlowRenderer {
                     y,
                     width,
                     1.0,
-                    &Source::Solid(config.ask_color.into()),
+                    &Source::Solid(color_schema.volume_sell.into()),
                     &DrawOptions::new(),
                 );
             }

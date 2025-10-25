@@ -1,5 +1,6 @@
 mod candles;
 mod color;
+mod color_schema;
 mod config;
 mod dom;
 mod interval;
@@ -9,9 +10,11 @@ mod order_flow;
 mod px_per_tick;
 mod symbol;
 mod timestamp;
+mod trader;
 
 pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use color::Color;
+pub use color_schema::ColorSchema;
 pub use config::Config;
 pub use dom::{DomState, SharedDomState};
 pub use interval::Interval;
@@ -21,3 +24,4 @@ pub use order_flow::{OrderFlowState, SharedOrderFlowState};
 pub use px_per_tick::PxPerTick;
 pub use symbol::Symbol;
 pub use timestamp::Timestamp;
+pub use trader::Trader;
