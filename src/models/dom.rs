@@ -49,6 +49,14 @@ impl DomState {
         Some(((*best_bid + *best_ask) / Decimal::from(2) / self.tick_size).floor() * self.tick_size)
     }
 
+    pub fn bid(&self) -> Option<Decimal> {
+        self.bids.keys().next_back().cloned()
+    }
+
+    pub fn ask(&self) -> Option<Decimal> {
+        self.asks.keys().next().cloned()
+    }
+
     pub fn clear(&mut self) {
         self.bids.clear();
         self.asks.clear();

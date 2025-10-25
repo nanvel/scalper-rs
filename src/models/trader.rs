@@ -21,6 +21,7 @@ impl Trader {
                 quantity: Some(quantity.to_string()),
                 price: None,
                 time_in_force: None,
+                new_order_resp_type: Some("RESULT".into()),
             })
             .await
             .unwrap();
@@ -37,6 +38,7 @@ impl Trader {
                 quantity: Some(quantity.to_string()),
                 price: None,
                 time_in_force: None,
+                new_order_resp_type: Some("RESULT".to_string()),
             })
             .await
             .unwrap();
@@ -55,24 +57,56 @@ impl Trader {
         }
 
         if total_quantity > Decimal::ZERO {
-            // Need to sell to flat
             self.sell(client, symbol, total_quantity).await;
         } else if total_quantity < Decimal::ZERO {
-            // Need to buy to flat
             self.buy(client, symbol, -total_quantity).await;
         }
     }
 
-    pub fn pnl(&self) -> Decimal {
-        let mut pnl = Decimal::ZERO;
+    pub fn base_balance(&self) -> Decimal {
+        let mut base_balance = Decimal::ZERO;
+        for order in &self.orders {
+            let executed_qty = order.executed_qty;
+            match order.side {
+                OrderSide::Buy => {
+                    base_balance += executed_qty;
+                }
+                OrderSide::Sell => {
+                    base_balance -= executed_qty;
+                }
+            }
+        }
+        base_balance
+    }
+
+    pub fn pnl(&self, bid: Option<Decimal>, ask: Option<Decimal>) -> Decimal {
+        if !bid.is_some() && !ask.is_some() {
+            return Decimal::ZERO;
+        }
+
+        let mut spent = Decimal::ZERO;
+        let mut received = Decimal::ZERO;
+        let mut base_balance = Decimal::ZERO;
         for order in &self.orders {
             let executed_qty = order.executed_qty;
             let price = order.avg_price;
             match order.side {
-                OrderSide::Buy => pnl -= price * executed_qty,
-                OrderSide::Sell => pnl += price * executed_qty,
+                OrderSide::Buy => {
+                    spent += price * executed_qty;
+                    base_balance += executed_qty;
+                }
+                OrderSide::Sell => {
+                    received += price * executed_qty;
+                    base_balance -= executed_qty;
+                }
             }
         }
-        pnl
+        if base_balance > Decimal::ZERO {
+            received += bid.unwrap() * base_balance;
+        } else if base_balance < Decimal::ZERO {
+            spent += ask.unwrap() * -base_balance;
+        }
+
+        received - spent
     }
 }

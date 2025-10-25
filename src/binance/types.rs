@@ -89,6 +89,8 @@ pub struct OrderRequest {
     pub price: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time_in_force: Option<TimeInForce>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_order_resp_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -21,6 +21,7 @@ impl StatusRenderer {
         text_renderer: &TextRenderer,
         color_schema: &ColorSchema,
         pnl: Decimal,
+        balance: Decimal,
     ) {
         dt.fill_rect(
             self.area.left as f32,
@@ -52,7 +53,15 @@ impl StatusRenderer {
         text_renderer.draw(
             dt,
             &pnl.to_string(),
-            self.area.left + self.area.width - 50,
+            self.area.left + self.area.width - 100,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+        text_renderer.draw(
+            dt,
+            &balance.to_string(),
+            self.area.left + self.area.width - 200,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,

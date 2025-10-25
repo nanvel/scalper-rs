@@ -243,6 +243,10 @@ impl BinanceClient {
             params.push(("timeInForce", format!("{:?}", tif).to_uppercase()));
         }
 
+        if let Some(nort) = order.new_order_resp_type {
+            params.push(("newOrderRespType", nort));
+        }
+
         self.post_signed("/fapi/v1/order", params).await
     }
 

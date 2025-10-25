@@ -193,9 +193,8 @@ fn main() {
             rt.block_on(trader.buy(&client, &symbol, size_base))
         }
 
-        if window.is_key_pressed(Key::X, minifb::KeyRepeat::No)
+        if window.is_key_pressed(Key::Z, minifb::KeyRepeat::No)
             && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
         {
             rt.block_on(trader.sell(&client, &symbol, size_base))
         }
@@ -305,14 +304,18 @@ fn main() {
                 force_redraw,
             );
         }
-        status_renderer.render(
-            interval,
-            size,
-            &mut dt,
-            &text_renderer,
-            &color_schema,
-            trader.pnl(),
-        );
+        {
+            let dom_state = shared_dom_state.read().unwrap();
+            status_renderer.render(
+                interval,
+                size,
+                &mut dt,
+                &text_renderer,
+                &color_schema,
+                trader.pnl(dom_state.bid(), dom_state.ask()),
+                trader.base_balance(),
+            );
+        }
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window
