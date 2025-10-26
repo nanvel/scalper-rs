@@ -341,7 +341,9 @@ fn main() {
             );
         }
         let active_alerts = alerts_manager.get_active_alerts();
-        if !active_alerts.is_empty() {
+        if active_alerts.is_empty() {
+            window.set_title(&format!("Scalper - {}", symbol.slug));
+        } else {
             window.set_title(&active_alerts.iter().next().unwrap().message);
         }
 

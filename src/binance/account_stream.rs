@@ -76,7 +76,7 @@ pub async fn start_account_stream(
                                         alerts_sender
                                             .send(Notification::new(
                                                 NotificationLevel::Info,
-                                                format!("{:?}", er),
+                                                format!("Filled {:?}", er.order_id),
                                                 Some(10),
                                             ))
                                             .ok();
