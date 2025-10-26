@@ -10,6 +10,7 @@ pub struct Layout {
     pub dom_area: Area,
     pub order_flow_area: Area,
     pub status_area: Area,
+    pub notifications_area: Area,
 }
 
 impl Layout {
@@ -46,11 +47,19 @@ impl Layout {
             height: window_height - status_height,
         };
 
+        let notifications_area = Area {
+            left: 0,
+            top: 0,
+            width: window_width - dom_width - order_flow_width,
+            height: window_height - status_height,
+        };
+
         Self {
             candles_area,
             dom_area,
             order_flow_area,
             status_area,
+            notifications_area,
         }
     }
 }

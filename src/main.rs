@@ -1,6 +1,7 @@
 mod binance;
 mod graphics;
 mod models;
+mod notifications;
 mod use_cases;
 
 use binance::BinanceClient;
@@ -10,10 +11,11 @@ use models::{
     CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
     OrderFlowState, PxPerTick, Trader,
 };
+use notifications::AlertManager;
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, mpsc::channel};
 use tokio::runtime;
 use use_cases::listen_open_interest::listen_open_interest;
 use use_cases::listen_orders::listen_orders;
@@ -108,6 +110,9 @@ fn main() {
     )
     .unwrap();
 
+    let (alert_sender, alert_receiver) = channel();
+    let mut alerts_manager = AlertManager::new(alert_receiver);
+
     let mut interval = Interval::M5;
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
@@ -130,7 +135,7 @@ fn main() {
     );
 
     listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
-    listen_orders(&config, symbol.slug.to_string());
+    listen_orders(&config, symbol.slug.to_string(), alert_sender.clone());
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -151,6 +156,8 @@ fn main() {
     let mut force_redraw = true;
     let mut left_was_pressed = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
+        alerts_manager.update();
+
         // pause recenter if ctrl is pressed
         if !center.is_some()
             || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
@@ -332,6 +339,10 @@ fn main() {
                 trader.pnl(dom_state.bid(), dom_state.ask()),
                 trader.base_balance(),
             );
+        }
+        let active_alerts = alerts_manager.get_active_alerts();
+        if !active_alerts.is_empty() {
+            window.set_title(&active_alerts.iter().next().unwrap().message);
         }
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();

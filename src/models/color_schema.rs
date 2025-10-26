@@ -34,6 +34,7 @@ pub struct ColorSchema {
     pub text_dark: Color,
     pub text_negative_pnl: Color,
     pub text_positive_pnl: Color,
+    pub text_error: Color,
 
     pub border: Color,
     pub crosshair: Color,
@@ -67,6 +68,7 @@ impl ColorSchema {
             text_dark: Color::new(31, 41, 55, 255),     // #1F2937
             text_negative_pnl: Color::new(248, 113, 113, 255), // #F87171
             text_positive_pnl: Color::new(52, 211, 153, 255), // #34D399
+            text_error: Color::new(248, 113, 113, 255), // #F87171
 
             // UI elements
             border: Color::new(55, 65, 81, 255),       // #374151
@@ -101,6 +103,7 @@ impl ColorSchema {
             text_dark: Color::new(249, 250, 251, 255), // #F9FAFB
             text_negative_pnl: Color::new(220, 38, 38, 255), // #DC2626
             text_positive_pnl: Color::new(5, 150, 105, 255), // #059669
+            text_error: Color::new(220, 38, 38, 255), // #DC2626
 
             // UI elements
             border: Color::new(229, 231, 235, 255), // #E5E7EB

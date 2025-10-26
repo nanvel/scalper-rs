@@ -1,5 +1,8 @@
+use crate::notifications::{Notification, NotificationLevel};
 use futures_util::stream::StreamExt;
 use serde::Deserialize;
+use std::os::macos::raw::stat;
+use std::sync::mpsc::Sender;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 #[derive(Debug, Deserialize, Clone)]
@@ -46,6 +49,7 @@ pub struct ExecutionReport {
 pub async fn start_account_stream(
     listen_key: String,
     symbol: String,
+    alerts_sender: Sender<crate::notifications::Notification>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ws_url = format!("wss://fstream.binance.com/ws/{}", listen_key);
     let (ws_stream, _) = connect_async(ws_url).await?;
@@ -67,13 +71,17 @@ pub async fn start_account_stream(
                     if let Ok(er) = serde_json::from_value::<ExecutionReport>(candidate) {
                         if let Some(sym) = &er.symbol {
                             if sym.eq_ignore_ascii_case(&symbol) {
-                                if matches!(
-                                    er.event_type.as_deref(),
-                                    Some("NEW") | Some("PARTIAL_FILL")
-                                ) {
-                                    dbg!(er);
-                                } else {
-                                    dbg!(er);
+                                match &er.current_order_status {
+                                    Some(s) if s.eq("FILLED") => {
+                                        alerts_sender
+                                            .send(Notification::new(
+                                                NotificationLevel::Info,
+                                                format!("{:?}", er),
+                                                Some(10),
+                                            ))
+                                            .ok();
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
