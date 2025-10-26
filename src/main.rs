@@ -145,16 +145,21 @@ fn main() {
     let mut px_per_tick = PxPerTick::default();
     let mut force_redraw = true;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if let current_center = shared_dom_state.read().unwrap().center() {
-            if center.is_some() {
-                if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
-                    * px_per_tick.get()
-                    >= Decimal::from(window_height / 4)
-                {
+        // pause recenter if ctrl is pressed
+        if !center.is_some()
+            || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        {
+            if let current_center = shared_dom_state.read().unwrap().center() {
+                if center.is_some() {
+                    if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
+                        * px_per_tick.get()
+                        >= Decimal::from(window_height / 4)
+                    {
+                        center = current_center;
+                    }
+                } else {
                     center = current_center;
                 }
-            } else {
-                center = current_center;
             }
         }
 
