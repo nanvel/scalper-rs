@@ -179,6 +179,8 @@ fn main() {
                 dom_renderer = DomRenderer::new(layout.dom_area);
                 order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
                 status_renderer = StatusRenderer::new(layout.status_area);
+
+                force_redraw = true;
             }
         }
 
