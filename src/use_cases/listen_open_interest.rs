@@ -2,7 +2,6 @@ use crate::models::{SharedOpenInterestState, Timestamp};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use std::os::macos::raw::stat;
 use std::str::FromStr;
 use std::thread;
 use tokio::runtime;

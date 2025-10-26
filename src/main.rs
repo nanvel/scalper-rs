@@ -16,6 +16,7 @@ use std::env;
 use std::sync::{Arc, RwLock};
 use tokio::runtime;
 use use_cases::listen_open_interest::listen_open_interest;
+use use_cases::listen_orders::listen_orders;
 use use_cases::listen_streams::listen_streams;
 
 fn restart_streams(
@@ -69,7 +70,10 @@ fn main() {
         .build()
         .expect("failed to build tokio runtime");
 
-    let client = BinanceClient::new(config.binance_access_key, config.binance_secret_key);
+    let client = BinanceClient::new(
+        config.binance_access_key.clone(),
+        config.binance_secret_key.clone(),
+    );
     let mut trader = Trader::new();
 
     let symbol_slug = &args[1];
@@ -126,6 +130,7 @@ fn main() {
     );
 
     listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
+    listen_orders(&config, symbol.slug.to_string());
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);

@@ -129,3 +129,9 @@ pub struct ApiError {
 pub struct TickerPriceResponse {
     pub price: Decimal,
 }
+
+#[derive(serde::Deserialize)]
+pub struct ListenKeyResponse {
+    #[serde(rename = "listenKey")]
+    pub listen_key: String,
+}
