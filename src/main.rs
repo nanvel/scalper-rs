@@ -5,7 +5,7 @@ mod use_cases;
 
 use binance::BinanceClient;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
     CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
     OrderFlowState, PxPerTick, Trader,
@@ -149,6 +149,7 @@ fn main() {
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
     let mut force_redraw = true;
+    let mut left_was_pressed = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         // pause recenter if ctrl is pressed
         if !center.is_some()
@@ -274,6 +275,16 @@ fn main() {
                 force_redraw = true;
             }
         }
+
+        let left_pressed = window.get_mouse_down(MouseButton::Left);
+        if left_pressed && !left_was_pressed {
+            if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
+                if window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl) {
+                    dbg!(x, y);
+                }
+            }
+        }
+        left_was_pressed = left_pressed;
 
         let color_schema = ColorSchema::for_theme(config.theme);
 
