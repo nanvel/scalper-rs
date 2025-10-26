@@ -1,5 +1,6 @@
 use super::text::TextRenderer;
 use crate::models::{Area, ColorSchema, Interval};
+use chrono::Utc;
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
 
@@ -62,6 +63,16 @@ impl StatusRenderer {
             dt,
             &balance.to_string(),
             self.area.left + self.area.width - 200,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+
+        let now = Utc::now();
+        text_renderer.draw(
+            dt,
+            &now.format("%H:%M:%S").to_string(),
+            self.area.left + self.padding * 2 + 80,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,
