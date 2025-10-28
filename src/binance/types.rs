@@ -77,6 +77,20 @@ pub struct Order {
     pub avg_price: Decimal,
 }
 
+impl Order {
+    pub fn is_open(&self) -> bool {
+        self.status == "NEW" || self.status == "PARTIALLY_FILLED"
+    }
+
+    pub fn is_closed(&self) -> bool {
+        if self.is_open() {
+            return false;
+        };
+
+        !self.executed_qty.is_zero()
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct OrderRequest {
     pub symbol: String,

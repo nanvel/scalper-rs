@@ -1,4 +1,5 @@
 use super::text::TextRenderer;
+use crate::binance::types::{Order, OrderSide};
 use crate::models::{Area, CandlesState, ColorSchema, OpenInterestState, Timestamp};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
@@ -32,6 +33,7 @@ impl CandlesRenderer {
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
+        orders: Vec<&Order>,
         force_redraw: bool,
     ) {
         if !force_redraw {
@@ -88,7 +90,8 @@ impl CandlesRenderer {
         };
 
         for (i, candle) in candles.iter().rev().enumerate() {
-            let x = self.area.width + self.area.left - self.padding - (i as i32) * candle_width;
+            let x =
+                self.area.width + self.area.left - self.padding - (i as i32) * candle_width - 12;
 
             let open_y = price_to_y(candle.open);
             let close_y = price_to_y(candle.close);
@@ -177,7 +180,10 @@ impl CandlesRenderer {
         let vh_dec = Decimal::from_i32(volume_height).unwrap_or(Decimal::from(40));
         if max_volume > Decimal::ZERO {
             for (i, candle) in candles.iter().rev().enumerate() {
-                let x = self.area.width + self.area.left - self.padding - (i as i32) * candle_width;
+                let x = self.area.width + self.area.left
+                    - self.padding
+                    - (i as i32) * candle_width
+                    - 12;
 
                 // Compute bar height proportional to volume
                 let bar_height = ((candle.volume / max_volume) * vh_dec)
@@ -334,5 +340,55 @@ impl CandlesRenderer {
             14,
             color_schema.text_light,
         );
+
+        // orders
+        for order in orders {
+            let color = match order.side {
+                OrderSide::Buy => color_schema.volume_buy,
+                OrderSide::Sell => color_schema.volume_sell,
+            };
+
+            if order.is_closed() {
+                // solid triangle
+                let y = price_to_y(order.avg_price);
+                let mut pb = PathBuilder::new();
+                pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
+                pb.line_to(
+                    ((self.area.left + self.area.width) - 10) as f32,
+                    (y - 4) as f32,
+                );
+                pb.line_to(
+                    ((self.area.left + self.area.width) - 10) as f32,
+                    (y + 4) as f32,
+                );
+                pb.close();
+                let path = pb.finish();
+                dt.fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
+            } else {
+                let y = price_to_y(order.avg_price);
+                let mut pb = PathBuilder::new();
+                pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
+                pb.line_to(
+                    ((self.area.left + self.area.width) - 10) as f32,
+                    (y - 4) as f32,
+                );
+                pb.line_to(
+                    ((self.area.left + self.area.width) - 10) as f32,
+                    (y + 4) as f32,
+                );
+                pb.close();
+                let path = pb.finish();
+                let stroke_style = StrokeStyle {
+                    width: 1.0,
+                    ..Default::default()
+                };
+                dt.stroke(
+                    &path,
+                    &Source::Solid(color.into()),
+                    &stroke_style,
+                    &DrawOptions::new(),
+                );
+            }
+        }
     }
 }

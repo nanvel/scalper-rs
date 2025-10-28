@@ -305,6 +305,7 @@ fn main() {
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                trader.orders(),
                 force_redraw,
             );
             dom_renderer.render(

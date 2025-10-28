@@ -109,4 +109,11 @@ impl Trader {
 
         received - spent
     }
+
+    pub fn orders(&self) -> Vec<&Order> {
+        self.orders
+            .iter()
+            .filter(|o| o.is_open() || o.is_closed())
+            .collect()
+    }
 }
