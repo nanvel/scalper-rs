@@ -1,7 +1,8 @@
 use super::auth::{build_signed_query, get_timestamp};
 use super::errors::{BinanceError, Result};
 use super::types::{
-    AccountInfo, ApiError, ExchangeInfo, Filter, Order, OrderRequest, TickerPriceResponse,
+    AccountInfo, ApiError, ExchangeInfo, Filter, ListenKeyResponse, Order, OrderRequest,
+    TickerPriceResponse,
 };
 use crate::models::Symbol;
 use reqwest::{Client, Response};
@@ -261,6 +262,11 @@ impl BinanceClient {
     pub async fn cancel_all_orders(&self, symbol: &str) -> Result<Vec<Order>> {
         let params = vec![("symbol", symbol.to_string())];
         self.delete_signed("/fapi/v1/allOpenOrders", params).await
+    }
+
+    pub async fn get_listen_key(&self) -> Result<String> {
+        let response: ListenKeyResponse = self.post_signed("/fapi/v1/listenKey", vec![]).await?;
+        Ok(response.listen_key)
     }
 }
 

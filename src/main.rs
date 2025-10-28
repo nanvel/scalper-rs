@@ -1,21 +1,24 @@
 mod binance;
 mod graphics;
 mod models;
+mod notifications;
 mod use_cases;
 
 use binance::BinanceClient;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
-use minifb::{Key, Window, WindowOptions};
+use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
     CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
     OrderFlowState, PxPerTick, Trader,
 };
+use notifications::AlertManager;
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, mpsc::channel};
 use tokio::runtime;
 use use_cases::listen_open_interest::listen_open_interest;
+use use_cases::listen_orders::listen_orders;
 use use_cases::listen_streams::listen_streams;
 
 fn restart_streams(
@@ -69,7 +72,10 @@ fn main() {
         .build()
         .expect("failed to build tokio runtime");
 
-    let client = BinanceClient::new(config.binance_access_key, config.binance_secret_key);
+    let client = BinanceClient::new(
+        config.binance_access_key.clone(),
+        config.binance_secret_key.clone(),
+    );
     let mut trader = Trader::new();
 
     let symbol_slug = &args[1];
@@ -104,6 +110,9 @@ fn main() {
     )
     .unwrap();
 
+    let (alert_sender, alert_receiver) = channel();
+    let mut alerts_manager = AlertManager::new(alert_receiver);
+
     let mut interval = Interval::M5;
     let candles_limit = 100;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
@@ -126,6 +135,7 @@ fn main() {
     );
 
     listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
+    listen_orders(&config, symbol.slug.to_string(), alert_sender.clone());
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -144,17 +154,25 @@ fn main() {
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
     let mut force_redraw = true;
+    let mut left_was_pressed = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        if let current_center = shared_dom_state.read().unwrap().center() {
-            if center.is_some() {
-                if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
-                    * px_per_tick.get()
-                    >= Decimal::from(window_height / 4)
-                {
+        alerts_manager.update();
+
+        // pause recenter if ctrl is pressed
+        if !center.is_some()
+            || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        {
+            if let current_center = shared_dom_state.read().unwrap().center() {
+                if center.is_some() {
+                    if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
+                        * px_per_tick.get()
+                        >= Decimal::from(window_height / 4)
+                    {
+                        center = current_center;
+                    }
+                } else {
                     center = current_center;
                 }
-            } else {
-                center = current_center;
             }
         }
 
@@ -169,6 +187,8 @@ fn main() {
                 dom_renderer = DomRenderer::new(layout.dom_area);
                 order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
                 status_renderer = StatusRenderer::new(layout.status_area);
+
+                force_redraw = true;
             }
         }
 
@@ -187,21 +207,15 @@ fn main() {
             size_base = size_base_3;
         }
 
-        if window.is_key_pressed(Key::X, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
-        {
+        if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
             rt.block_on(trader.buy(&client, &symbol, size_base))
         }
 
-        if window.is_key_pressed(Key::Z, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
-        {
+        if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
             rt.block_on(trader.sell(&client, &symbol, size_base))
         }
 
-        if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
-        {
+        if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
             rt.block_on(trader.flat(&client, &symbol))
         }
 
@@ -269,6 +283,16 @@ fn main() {
             }
         }
 
+        let left_pressed = window.get_mouse_down(MouseButton::Left);
+        if left_pressed && !left_was_pressed {
+            if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
+                if window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl) {
+                    dbg!(x, y);
+                }
+            }
+        }
+        left_was_pressed = left_pressed;
+
         let color_schema = ColorSchema::for_theme(config.theme);
 
         if let Some(center_price) = center {
@@ -281,6 +305,7 @@ fn main() {
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
+                trader.orders(),
                 force_redraw,
             );
             dom_renderer.render(
@@ -315,6 +340,12 @@ fn main() {
                 trader.pnl(dom_state.bid(), dom_state.ask()),
                 trader.base_balance(),
             );
+        }
+        let active_alerts = alerts_manager.get_active_alerts();
+        if active_alerts.is_empty() {
+            window.set_title(&format!("Scalper - {}", symbol.slug));
+        } else {
+            window.set_title(&active_alerts.iter().next().unwrap().message);
         }
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
