@@ -1,4 +1,5 @@
 mod binance;
+mod exchanges;
 mod graphics;
 mod models;
 mod notifications;
