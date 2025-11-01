@@ -1,7 +1,9 @@
+use crate::models::Timestamp;
 use crate::notifications::{Notification, NotificationLevel};
+use crate::trader;
 use futures_util::stream::StreamExt;
+use rust_decimal::Decimal;
 use serde::Deserialize;
-use std::os::macos::raw::stat;
 use std::sync::mpsc::Sender;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
@@ -18,9 +20,9 @@ pub struct ExecutionReport {
     #[serde(rename = "o")]
     pub order_type: Option<String>,
     #[serde(rename = "q")]
-    pub orig_qty: Option<String>,
+    pub orig_qty: Option<Decimal>,
     #[serde(rename = "p")]
-    pub price: Option<String>,
+    pub price: Option<Decimal>,
     #[serde(rename = "x")]
     pub current_exec_type: Option<String>,
     #[serde(rename = "X")]
@@ -30,13 +32,21 @@ pub struct ExecutionReport {
     #[serde(rename = "l")]
     pub last_executed_qty: Option<String>,
     #[serde(rename = "z")]
-    pub accumulated_executed_qty: Option<String>,
+    pub accumulated_executed_qty: Option<Decimal>,
     #[serde(rename = "L")]
     pub last_executed_price: Option<String>,
-    #[serde(rename = "n")]
-    pub commission: Option<String>,
     #[serde(rename = "T")]
     pub trade_time: Option<u64>,
+    #[serde(rename = "ap")]
+    pub avg_price: Option<Decimal>,
+}
+
+impl ExecutionReport {
+    pub fn commission(&self) -> Decimal {
+        self.avg_price.unwrap()
+            * self.accumulated_executed_qty.as_ref().unwrap()
+            * Decimal::new(2, 3)
+    }
 }
 
 /// Start listening for account/order updates on the Binance futures user data stream.
@@ -49,7 +59,8 @@ pub struct ExecutionReport {
 pub async fn start_account_stream(
     listen_key: String,
     symbol: String,
-    alerts_sender: Sender<crate::notifications::Notification>,
+    alerts_sender: Sender<Notification>,
+    orders_sender: Sender<trader::Order>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ws_url = format!("wss://fstream.binance.com/ws/{}", listen_key);
     let (ws_stream, _) = connect_async(ws_url).await?;
@@ -78,6 +89,40 @@ pub async fn start_account_stream(
                                                 NotificationLevel::Info,
                                                 format!("Filled {:?}", er.order_id),
                                                 Some(10),
+                                            ))
+                                            .ok();
+                                        let order_side = match &er.side {
+                                            Some(s) if s.eq("BUY") => trader::OrderSide::Buy,
+                                            Some(s) if s.eq("SELL") => trader::OrderSide::Sell,
+                                            _ => panic!("Invalid order side"),
+                                        };
+                                        let order_type = match &er.order_type {
+                                            Some(t) if t.eq("MARKET") => trader::OrderType::Market,
+                                            Some(t) if t.eq("LIMIT") => trader::OrderType::Limit,
+                                            Some(t) if t.eq("STOP_MARKET") => {
+                                                trader::OrderType::Stop
+                                            }
+                                            _ => panic!("Invalid order type"),
+                                        };
+                                        let order_status = match &er.current_order_status {
+                                            Some(s) if s.eq("NEW") => trader::OrderStatus::Pending,
+                                            Some(s) if s.eq("PARTIALLY_FILLED") => {
+                                                trader::OrderStatus::Pending
+                                            }
+                                            _ => trader::OrderStatus::Filled,
+                                        };
+                                        orders_sender
+                                            .send(trader::Order::new(
+                                                er.order_id.unwrap_or_default().to_string(),
+                                                order_type,
+                                                order_side,
+                                                order_status,
+                                                er.orig_qty.unwrap(),
+                                                er.accumulated_executed_qty.unwrap(),
+                                                er.price.unwrap(),
+                                                er.avg_price.unwrap(),
+                                                er.commission(),
+                                                Timestamp::from(er.trade_time.unwrap() / 1000),
                                             ))
                                             .ok();
                                     }

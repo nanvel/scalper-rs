@@ -120,9 +120,6 @@ pub enum OrderType {
     Limit,
     Market,
     StopLoss,
-    StopLossLimit,
-    TakeProfit,
-    TakeProfitLimit,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -131,6 +128,17 @@ pub enum TimeInForce {
     Gtc, // Good Till Cancel
     Ioc, // Immediate or Cancel
     Fok, // Fill or Kill
+}
+
+impl From<&str> for TimeInForce {
+    fn from(s: &str) -> Self {
+        match s.to_uppercase().as_str() {
+            "GTC" => TimeInForce::Gtc,
+            "IOC" => TimeInForce::Ioc,
+            "FOK" => TimeInForce::Fok,
+            _ => panic!("Invalid TimeInForce value"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

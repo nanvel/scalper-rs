@@ -2,6 +2,7 @@ mod binance;
 mod graphics;
 mod models;
 mod notifications;
+mod trader;
 mod use_cases;
 
 use binance::BinanceClient;
@@ -15,7 +16,7 @@ use notifications::AlertManager;
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
-use std::sync::{Arc, RwLock, mpsc::channel};
+use std::sync::{Arc, RwLock, mpsc};
 use tokio::runtime;
 use use_cases::listen_open_interest::listen_open_interest;
 use use_cases::listen_orders::listen_orders;
@@ -110,7 +111,8 @@ fn main() {
     )
     .unwrap();
 
-    let (alert_sender, alert_receiver) = channel();
+    let (alert_sender, alert_receiver) = mpsc::channel();
+    let (orders_sender, orders_receiver) = mpsc::channel();
     let mut alerts_manager = AlertManager::new(alert_receiver);
 
     let mut interval = Interval::M5;
@@ -135,7 +137,12 @@ fn main() {
     );
 
     listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
-    listen_orders(&config, symbol.slug.to_string(), alert_sender.clone());
+    listen_orders(
+        &config,
+        symbol.slug.to_string(),
+        alert_sender.clone(),
+        orders_sender.clone(),
+    );
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -156,6 +163,18 @@ fn main() {
     let mut force_redraw = true;
     let mut left_was_pressed = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
+        match orders_receiver.try_recv() {
+            Ok(value) => {
+                dbg!("Received: {}", value);
+            }
+            Err(mpsc::TryRecvError::Empty) => {
+                println!("No message available");
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                println!("Sender disconnected");
+            }
+        };
+
         alerts_manager.update();
 
         // pause recenter if ctrl is pressed

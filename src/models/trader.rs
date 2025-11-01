@@ -46,6 +46,98 @@ impl Trader {
         self.orders.push(order);
     }
 
+    pub async fn limit_sell(
+        &mut self,
+        client: &BinanceClient,
+        symbol: &Symbol,
+        quantity: Decimal,
+        price: Decimal,
+    ) {
+        let order = client
+            .place_order(OrderRequest {
+                symbol: symbol.slug.clone(),
+                side: OrderSide::Sell,
+                order_type: OrderType::Limit,
+                quantity: Some(quantity.to_string()),
+                price: Some(price.to_string()),
+                time_in_force: Some("GTC".into()),
+                new_order_resp_type: Some("RESULT".into()),
+            })
+            .await
+            .unwrap();
+
+        self.orders.push(order);
+    }
+
+    pub async fn stop_buy(
+        &mut self,
+        client: &BinanceClient,
+        symbol: &Symbol,
+        quantity: Decimal,
+        price: Decimal,
+    ) {
+        let order = client
+            .place_order(OrderRequest {
+                symbol: symbol.slug.clone(),
+                side: OrderSide::Buy,
+                order_type: OrderType::StopLoss,
+                quantity: Some(quantity.to_string()),
+                price: Some(price.to_string()),
+                time_in_force: Some("GTC".into()),
+                new_order_resp_type: Some("RESULT".into()),
+            })
+            .await
+            .unwrap();
+
+        self.orders.push(order);
+    }
+
+    pub async fn stop_sell(
+        &mut self,
+        client: &BinanceClient,
+        symbol: &Symbol,
+        quantity: Decimal,
+        price: Decimal,
+    ) {
+        let order = client
+            .place_order(OrderRequest {
+                symbol: symbol.slug.clone(),
+                side: OrderSide::Sell,
+                order_type: OrderType::StopLoss,
+                quantity: Some(quantity.to_string()),
+                price: Some(price.to_string()),
+                time_in_force: Some("GTC".into()),
+                new_order_resp_type: Some("RESULT".into()),
+            })
+            .await
+            .unwrap();
+
+        self.orders.push(order);
+    }
+
+    pub async fn limit_buy(
+        &mut self,
+        client: &BinanceClient,
+        symbol: &Symbol,
+        quantity: Decimal,
+        price: Decimal,
+    ) {
+        let order = client
+            .place_order(OrderRequest {
+                symbol: symbol.slug.clone(),
+                side: OrderSide::Buy,
+                order_type: OrderType::Limit,
+                quantity: Some(quantity.to_string()),
+                price: Some(price.to_string()),
+                time_in_force: Some("GTC".into()),
+                new_order_resp_type: Some("RESULT".into()),
+            })
+            .await
+            .unwrap();
+
+        self.orders.push(order);
+    }
+
     pub async fn flat(&mut self, client: &BinanceClient, symbol: &Symbol) {
         let mut total_quantity = Decimal::ZERO;
         for order in &self.orders {
