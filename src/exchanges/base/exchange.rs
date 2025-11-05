@@ -11,7 +11,7 @@ pub trait Exchange: Send + Sync {
 
     fn set_interval(&mut self, interval: Interval) -> ();
 
-    fn submit_order(&self, new_order: NewOrder) -> ();
+    fn place_order(&self, new_order: NewOrder) -> ();
 
     fn cancel_order(&self, order: Order) -> ();
 }

@@ -120,12 +120,22 @@ impl Exchange for BinanceFuturesExchange {
         }
     }
 
-    fn submit_order(&self, new_order: NewOrder) -> () {
-        // Implementation for submitting a new order
+    fn place_order(&self, new_order: NewOrder) -> () {
+        if self.can_trade() {
+            thread::spawn(move || {
+                let order = self.client.place_order(new_order).unwrap();
+                self.orders_sender.send(order).unwrap();
+            });
+        }
     }
 
     fn cancel_order(&self, order: Order) -> () {
-        // Implementation for canceling an existing order
+        if self.can_trade() {
+            thread::spawn(move || {
+                let order = self.client.cancel_order(&order.id).unwrap();
+                self.orders_sender.send(order).unwrap();
+            });
+        }
     }
 }
 
@@ -160,9 +170,5 @@ impl BinanceFuturesExchange {
             stop_tx: None,
             handle: None,
         }
-    }
-
-    fn start_streams(&self) {
-        // Implementation for starting WebSocket streams
     }
 }
