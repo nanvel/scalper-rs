@@ -211,7 +211,7 @@ impl BinanceClient {
                 return Ok(Symbol {
                     tick_size: t_s,
                     step_size: s_s,
-                    notional: n,
+                    min_notional: n,
                     slug: sym.symbol,
                 });
             }

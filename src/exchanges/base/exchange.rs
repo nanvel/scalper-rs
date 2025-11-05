@@ -1,20 +1,27 @@
+use crate::models::Message;
 use crate::models::{
-    SharedCandlesState, SharedDomState, SharedOpenInterestState, SharedOrderFlowState, Symbol,
+    Interval, NewOrder, Order, SharedCandlesState, SharedDomState, SharedOpenInterestState,
+    SharedOrderFlowState, Symbol,
 };
+use std::sync::mpsc::Sender;
 
 pub trait Exchange: Send + Sync {
-    fn listen(
+    fn start(
         &mut self,
-        symbol: Symbol,
+        symbol: &str,
         candles: SharedCandlesState,
         dom: SharedDomState,
         open_interest: SharedOpenInterestState,
         order_flow: SharedOrderFlowState,
-    ) -> ();
+        messages_sender: Sender<Message>,
+        orders_sender: Sender<Order>,
+    ) -> Result<Symbol, dyn std::error::Error>;
 
-    fn stop(&mut self) -> ();
+    fn stop() -> ();
 
-    fn submit_order(&self, symbol: &Symbol, quantity: f64, price: f64, side: String) -> ();
+    fn set_interval(&mut self, interval: Interval) -> ();
 
-    fn cancel_order(&self, symbol: &Symbol, order_id: &str) -> ();
+    fn submit_order(&self, new_order: NewOrder) -> ();
+
+    fn cancel_order(&self, order: Order) -> ();
 }

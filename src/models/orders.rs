@@ -21,17 +21,25 @@ pub enum OrderStatus {
 }
 
 #[derive(Debug)]
+pub struct NewOrder {
+    pub order_type: OrderType,
+    pub order_side: OrderSide,
+    pub quantity: Decimal,
+    pub price: Option<Decimal>,
+}
+
+#[derive(Debug)]
 pub struct Order {
-    id: String,
-    order_type: OrderType,
-    order_side: OrderSide,
-    order_status: OrderStatus,
-    quantity: Decimal,
-    executed_quantity: Decimal,
-    price: Decimal,
-    average_price: Decimal,
-    commission: Decimal,
-    timestamp: Timestamp,
+    pub id: String,
+    pub order_type: OrderType,
+    pub order_side: OrderSide,
+    pub order_status: OrderStatus,
+    pub quantity: Decimal,
+    pub executed_quantity: Decimal,
+    pub price: Decimal,
+    pub average_price: Decimal,
+    pub commission: Decimal,
+    pub timestamp: Timestamp,
 }
 
 impl Order {

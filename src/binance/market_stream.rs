@@ -66,8 +66,6 @@ struct AggTradeEvent {
 
 pub async fn start_market_stream(
     symbol: String,
-    interval: Interval,
-    candles_limit: usize,
     dom_limit: usize,
     shared_candles_state: SharedCandlesState,
     shared_dom_state: SharedDomState,
@@ -75,41 +73,10 @@ pub async fn start_market_stream(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let http_client = Client::builder().user_agent("scalper-rs/0.1").build()?;
 
-    // Fetch initial candles
-    let candles_url = format!(
-        "https://fapi.binance.com/fapi/v1/klines?symbol={}&interval={}&limit={}",
-        symbol,
-        interval.slug(),
-        candles_limit
-    );
-
-    let response = http_client.get(&candles_url).send().await?;
-    let data: Vec<serde_json::Value> = response.json().await?;
-
-    let initial_candles: Vec<Candle> = data
-        .iter()
-        .map(|k| Candle {
-            open_time: (k[0].as_u64().unwrap() / 1000).into(),
-            open: Decimal::from_str(k[1].as_str().unwrap()).unwrap_or(Decimal::ZERO),
-            high: Decimal::from_str(k[2].as_str().unwrap()).unwrap_or(Decimal::ZERO),
-            low: Decimal::from_str(k[3].as_str().unwrap()).unwrap_or(Decimal::ZERO),
-            close: Decimal::from_str(k[4].as_str().unwrap()).unwrap_or(Decimal::ZERO),
-            volume: Decimal::from_str(k[5].as_str().unwrap()).unwrap_or(Decimal::ZERO),
-        })
-        .collect();
-
-    {
-        let mut buffer = shared_candles_state.write().unwrap();
-        for candle in initial_candles {
-            buffer.push(candle);
-        }
-    }
-
     // Listen on the WebSocket
     let ws_url = format!(
-        "wss://fstream.binance.com/stream?streams={}@kline_{}/{}@depth@100ms/{}@aggTrade",
+        "wss://fstream.binance.com/stream?streams={}@kline_1m/{}@depth@100ms/{}@aggTrade",
         symbol.to_lowercase(),
-        interval.slug(),
         symbol.to_lowercase(),
         symbol.to_lowercase(),
     );

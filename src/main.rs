@@ -2,18 +2,17 @@ mod binance;
 mod exchanges;
 mod graphics;
 mod models;
-mod notifications;
 mod trader;
 mod use_cases;
 
 use binance::BinanceClient;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
+use models::messages::AlertManager;
 use models::{
     CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
     OrderFlowState, PxPerTick, Trader,
 };
-use notifications::AlertManager;
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
@@ -118,7 +117,7 @@ fn main() {
 
     let mut interval = Interval::M5;
     let candles_limit = 100;
-    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
+    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit, interval)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
     let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
@@ -168,12 +167,8 @@ fn main() {
             Ok(value) => {
                 dbg!("Received: {}", value);
             }
-            Err(mpsc::TryRecvError::Empty) => {
-                println!("No message available");
-            }
-            Err(mpsc::TryRecvError::Disconnected) => {
-                println!("Sender disconnected");
-            }
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => {}
         };
 
         alerts_manager.update();
@@ -261,6 +256,7 @@ fn main() {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
+                shared_candles_state.write().unwrap().set_interval(interval);
                 // Restart streams with new interval: stop previous, join, then start new
                 let (new_handle, new_stop) = restart_streams(
                     handle,

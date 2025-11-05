@@ -1,5 +1,5 @@
 use crate::models::Timestamp;
-use crate::notifications::{Notification, NotificationLevel};
+use crate::models::messages::{Notification, NotificationLevel};
 use crate::trader;
 use futures_util::stream::StreamExt;
 use rust_decimal::Decimal;
