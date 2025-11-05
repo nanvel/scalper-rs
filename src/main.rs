@@ -2,16 +2,14 @@ mod binance;
 mod exchanges;
 mod graphics;
 mod models;
-mod trader;
 mod use_cases;
 
 use binance::BinanceClient;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::messages::AlertManager;
 use models::{
-    CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
-    OrderFlowState, PxPerTick, Trader,
+    CandlesState, ColorSchema, Config, DomState, Interval, Layout, MessageManager,
+    OpenInterestState, OrderFlowState, PxPerTick, Trader,
 };
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
@@ -113,11 +111,11 @@ fn main() {
 
     let (alert_sender, alert_receiver) = mpsc::channel();
     let (orders_sender, orders_receiver) = mpsc::channel();
-    let mut alerts_manager = AlertManager::new(alert_receiver);
+    let mut alerts_manager = MessageManager::new(alert_receiver);
 
     let mut interval = Interval::M5;
     let candles_limit = 100;
-    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit, interval)));
+    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
     let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
     let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));

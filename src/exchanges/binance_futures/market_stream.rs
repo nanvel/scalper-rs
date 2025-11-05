@@ -1,3 +1,4 @@
+use crate::exchanges::base::USER_AGENT;
 use crate::models::{Candle, Interval, SharedCandlesState, SharedDomState, SharedOrderFlowState};
 use futures_util::stream::StreamExt;
 use reqwest::Client;
@@ -71,9 +72,8 @@ pub async fn start_market_stream(
     shared_dom_state: SharedDomState,
     shared_order_flow_state: SharedOrderFlowState,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let http_client = Client::builder().user_agent("scalper-rs/0.1").build()?;
+    let http_client = Client::builder().user_agent(USER_AGENT).build()?;
 
-    // Listen on the WebSocket
     let ws_url = format!(
         "wss://fstream.binance.com/stream?streams={}@kline_1m/{}@depth@100ms/{}@aggTrade",
         symbol.to_lowercase(),
@@ -83,7 +83,6 @@ pub async fn start_market_stream(
     let (ws_stream, _) = connect_async(ws_url).await?;
     let (_write, mut read) = ws_stream.split();
 
-    // Fetch initial order book snapshot
     let dom_url = format!(
         "https://fapi.binance.com/fapi/v1/depth?symbol={}&limit={}",
         symbol, dom_limit
@@ -159,11 +158,11 @@ pub async fn start_market_stream(
                     } else if let Ok(event) = serde_json::from_value::<KlineEvent>(data.clone()) {
                         let candle = Candle {
                             open_time: (event.kline.start_time / 1000).into(),
-                            open: Decimal::from_str(&event.kline.open).unwrap_or(Decimal::ZERO),
-                            high: Decimal::from_str(&event.kline.high).unwrap_or(Decimal::ZERO),
-                            low: Decimal::from_str(&event.kline.low).unwrap_or(Decimal::ZERO),
-                            close: Decimal::from_str(&event.kline.close).unwrap_or(Decimal::ZERO),
-                            volume: Decimal::from_str(&event.kline.volume).unwrap_or(Decimal::ZERO),
+                            open: Decimal::from_str(&event.kline.open).unwrap(),
+                            high: Decimal::from_str(&event.kline.high).unwrap(),
+                            low: Decimal::from_str(&event.kline.low).unwrap(),
+                            close: Decimal::from_str(&event.kline.close).unwrap(),
+                            volume: Decimal::from_str(&event.kline.volume).unwrap(),
                         };
 
                         let mut buffer = shared_candles_state.write().unwrap();

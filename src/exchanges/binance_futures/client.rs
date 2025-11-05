@@ -1,6 +1,9 @@
 use super::auth::{build_signed_query, get_timestamp};
 use super::errors::{BinanceError, Result};
-use crate::models::{NewOrder, Order, OrderSide, OrderStatus, OrderType, Symbol, Timestamp};
+use crate::exchanges::base::USER_AGENT;
+use crate::models::{
+    Candle, NewOrder, Order, OrderSide, OrderStatus, OrderType, Symbol, Timestamp,
+};
 use reqwest::blocking::{Client, Response};
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
@@ -19,7 +22,7 @@ pub struct BinanceClient {
 impl BinanceClient {
     pub fn new(symbol: String, access_key: Option<String>, secret_key: Option<String>) -> Self {
         Self {
-            client: Client::new(),
+            client: Client::builder().user_agent(USER_AGENT).build().unwrap(),
             symbol,
             access_key,
             secret_key,
@@ -201,6 +204,29 @@ impl BinanceClient {
             }
         }
         Err(BinanceError::ParseError("Symbol not found".to_string()))
+    }
+
+    pub fn get_candles(&self, interval: &str, limit: usize) -> Result<Vec<Candle>> {
+        let params = vec![
+            ("symbol", self.symbol.as_str()),
+            ("interval", interval),
+            ("limit", limit.to_string().as_str()),
+        ];
+        let data: Vec<serde_json::Value> = self.get_public("/fapi/v1/klines", Some(&params))?;
+
+        let candles: Vec<Candle> = data
+            .iter()
+            .map(|k| Candle {
+                open_time: (k[0].as_u64().unwrap() / 1000).into(),
+                open: Decimal::from_str(k[1].as_str().unwrap()).unwrap(),
+                high: Decimal::from_str(k[2].as_str().unwrap()).unwrap(),
+                low: Decimal::from_str(k[3].as_str().unwrap()).unwrap(),
+                close: Decimal::from_str(k[4].as_str().unwrap()).unwrap(),
+                volume: Decimal::from_str(k[5].as_str().unwrap()).unwrap(),
+            })
+            .collect();
+
+        Ok(candles)
     }
 
     // === Private API endpoints (require authentication) ===
