@@ -3,11 +3,11 @@ use crate::models::{Interval, NewOrder, Order, Symbol};
 pub trait Exchange: Send + Sync {
     fn start(&mut self) -> Result<Symbol, dyn std::error::Error>;
 
+    fn stop(&self) -> ();
+
     fn can_trade(&self) -> bool {
         false
     }
-
-    fn stop(&self) -> ();
 
     fn set_interval(&mut self, interval: Interval) -> ();
 

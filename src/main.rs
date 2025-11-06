@@ -4,7 +4,7 @@ mod graphics;
 mod models;
 mod use_cases;
 
-use binance::BinanceClient;
+use crate::exchanges::ExchangeFactory;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
@@ -15,41 +15,6 @@ use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
 use std::sync::{Arc, RwLock, mpsc};
-use tokio::runtime;
-use use_cases::listen_open_interest::listen_open_interest;
-use use_cases::listen_orders::listen_orders;
-use use_cases::listen_streams::listen_streams;
-
-fn restart_streams(
-    handle: std::thread::JoinHandle<()>,
-    stop_tx: tokio::sync::oneshot::Sender<()>,
-    shared_candles_state: Arc<RwLock<CandlesState>>,
-    shared_dom_state: Arc<RwLock<DomState>>,
-    shared_order_flow_state: Arc<RwLock<OrderFlowState>>,
-    symbol_slug: String,
-    interval: Interval,
-    candles_limit: usize,
-) -> (
-    std::thread::JoinHandle<()>,
-    tokio::sync::oneshot::Sender<()>,
-) {
-    // best-effort shutdown of previous listener
-    let _ = stop_tx.send(());
-    let _ = handle.join();
-
-    shared_candles_state.write().unwrap().clear();
-    shared_dom_state.write().unwrap().clear();
-
-    listen_streams(
-        shared_candles_state,
-        shared_dom_state,
-        shared_order_flow_state,
-        symbol_slug,
-        interval,
-        candles_limit,
-        500,
-    )
-}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -65,35 +30,44 @@ fn main() {
         std::process::exit(1);
     });
 
-    let rt = runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .enable_all()
-        .build()
-        .expect("failed to build tokio runtime");
+    let (messages_sender, messages_receiver) = mpsc::channel();
+    let (orders_sender, orders_receiver) = mpsc::channel();
+    let mut alerts_manager = MessageManager::new(messages_receiver);
 
-    let client = BinanceClient::new(
-        config.binance_access_key.clone(),
-        config.binance_secret_key.clone(),
-    );
-    let mut trader = Trader::new();
+    let mut interval = Interval::M1;
+    let candles_limit = 100;
+    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
+    let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
+    let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
+    let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
+
+    let mut exchange = ExchangeFactory::create(
+        "binance_usd_futures",
+        args[1].clone(),
+        interval,
+        shared_candles_state.clone(),
+        shared_dom_state.clone(),
+        shared_open_interest_state.clone(),
+        shared_order_flow_state.clone(),
+        messages_sender,
+        orders_sender,
+        &config,
+    )
+    .unwrap_or_else(|err| {
+        eprintln!("Error creating exchange: {}", err);
+        std::process::exit(1);
+    });
+
+    let symbol = exchange.start().unwrap_or_else(|err| {
+        eprintln!("Error starting streams: {}", err);
+        std::process::exit(1);
+    });
 
     let symbol_slug = &args[1];
-    let symbol = rt
-        .block_on(client.get_symbol(&symbol_slug))
-        .unwrap_or_else(|err| {
-            eprintln!("Error loading symbol {}: {}", symbol_slug, err);
-            std::process::exit(1);
-        });
-    let ticker_price = rt
-        .block_on(client.get_ticker_price(&symbol_slug))
-        .unwrap_or_else(|err| {
-            eprintln!("Error loading ticker price for {}: {}", symbol_slug, err);
-            std::process::exit(1);
-        });
 
-    let size_base_1 = symbol.tune_quantity(config.size_1.unwrap() / ticker_price, ticker_price);
-    let size_base_2 = symbol.tune_quantity(config.size_2.unwrap() / ticker_price, ticker_price);
-    let size_base_3 = symbol.tune_quantity(config.size_3.unwrap() / ticker_price, ticker_price);
+    // let size_base_1 = symbol.tune_quantity(config.size_1.unwrap() / ticker_price, ticker_price);
+    // let size_base_2 = symbol.tune_quantity(config.size_2.unwrap() / ticker_price, ticker_price);
+    // let size_base_3 = symbol.tune_quantity(config.size_3.unwrap() / ticker_price, ticker_price);
 
     let mut window_width = 800;
     let mut window_height = 600;
@@ -109,38 +83,9 @@ fn main() {
     )
     .unwrap();
 
-    let (alert_sender, alert_receiver) = mpsc::channel();
-    let (orders_sender, orders_receiver) = mpsc::channel();
-    let mut alerts_manager = MessageManager::new(alert_receiver);
-
-    let mut interval = Interval::M5;
-    let candles_limit = 100;
-    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
-    let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
-    let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
-    let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
-
     let mut size_range = Decimal::ZERO;
     let mut size = config.size_1.unwrap();
-    let mut size_base = size_base_1;
-
-    let (mut handle, mut stop_tx) = listen_streams(
-        shared_candles_state.clone(),
-        shared_dom_state.clone(),
-        shared_order_flow_state.clone(),
-        symbol.slug.to_string(),
-        interval,
-        candles_limit,
-        500,
-    );
-
-    listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
-    listen_orders(
-        &config,
-        symbol.slug.to_string(),
-        alert_sender.clone(),
-        orders_sender.clone(),
-    );
+    // let mut size_base = size_base_1;
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -207,29 +152,29 @@ fn main() {
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
             size = config.size_1.unwrap();
-            size_base = size_base_1;
+            // size_base = size_base_1;
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
             size = config.size_2.unwrap();
-            size_base = size_base_2;
+            // size_base = size_base_2;
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
             size = config.size_3.unwrap();
-            size_base = size_base_3;
+            // size_base = size_base_3;
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
-            rt.block_on(trader.buy(&client, &symbol, size_base))
+            // rt.block_on(trader.buy(&client, &symbol, size_base))
         }
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
-            rt.block_on(trader.sell(&client, &symbol, size_base))
+            // rt.block_on(trader.sell(&client, &symbol, size_base))
         }
 
         if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
-            rt.block_on(trader.flat(&client, &symbol))
+            // rt.block_on(trader.flat(&client, &symbol))
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -254,20 +199,7 @@ fn main() {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
-                shared_candles_state.write().unwrap().set_interval(interval);
-                // Restart streams with new interval: stop previous, join, then start new
-                let (new_handle, new_stop) = restart_streams(
-                    handle,
-                    stop_tx,
-                    shared_candles_state.clone(),
-                    shared_dom_state.clone(),
-                    shared_order_flow_state.clone(),
-                    symbol.slug.to_string(),
-                    interval,
-                    candles_limit,
-                );
-                handle = new_handle;
-                stop_tx = new_stop;
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -279,19 +211,7 @@ fn main() {
             let new_interval = interval.down();
             if new_interval != interval {
                 interval = new_interval;
-                // Restart streams with new interval: stop previous, join, then start new
-                let (new_handle, new_stop) = restart_streams(
-                    handle,
-                    stop_tx,
-                    shared_candles_state.clone(),
-                    shared_dom_state.clone(),
-                    shared_order_flow_state.clone(),
-                    symbol.slug.to_string(),
-                    interval,
-                    candles_limit,
-                );
-                handle = new_handle;
-                stop_tx = new_stop;
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -370,6 +290,5 @@ fn main() {
         force_redraw = false;
     }
 
-    let _ = stop_tx.send(());
-    let _ = handle.join();
+    exchange.stop()
 }

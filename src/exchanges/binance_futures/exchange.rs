@@ -140,7 +140,7 @@ impl Exchange for BinanceFuturesExchange {
 }
 
 impl BinanceFuturesExchange {
-    fn new(
+    pub fn new(
         symbol: String,
         interval: Interval,
         candles: SharedCandlesState,
