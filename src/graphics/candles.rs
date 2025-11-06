@@ -1,6 +1,7 @@
 use super::text::TextRenderer;
-use crate::binance::types::{Order, OrderSide};
-use crate::models::{Area, CandlesState, ColorSchema, OpenInterestState, Timestamp};
+use crate::models::{
+    Area, CandlesState, ColorSchema, OpenInterestState, Order, OrderSide, Timestamp,
+};
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };

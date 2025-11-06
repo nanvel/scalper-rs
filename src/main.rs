@@ -5,11 +5,12 @@ mod models;
 mod use_cases;
 
 use crate::exchanges::ExchangeFactory;
+use crate::models::Orders;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
     CandlesState, ColorSchema, Config, DomState, Interval, Layout, MessageManager,
-    OpenInterestState, OrderFlowState, PxPerTick, Trader,
+    OpenInterestState, OrderFlowState, PxPerTick,
 };
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
@@ -99,6 +100,8 @@ fn main() {
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
+    let mut orders = Orders::new();
+
     window.set_target_fps(60);
 
     let mut center: Option<Decimal> = None;
@@ -108,6 +111,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
+                orders.on_order(value);
                 dbg!("Received: {}", value);
             }
             Err(mpsc::TryRecvError::Empty) => {}
@@ -239,7 +243,7 @@ fn main() {
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
-                trader.orders(),
+                orders.all(),
                 force_redraw,
             );
             dom_renderer.render(
@@ -271,8 +275,8 @@ fn main() {
                 &mut dt,
                 &text_renderer,
                 &color_schema,
-                trader.pnl(dom_state.bid(), dom_state.ask()),
-                trader.base_balance(),
+                orders.pnl(dom_state.bid(), dom_state.ask()),
+                orders.base_balance(),
             );
         }
         let active_alerts = alerts_manager.get_active_alerts();

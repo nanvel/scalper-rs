@@ -136,4 +136,13 @@ impl Orders {
 
         received - spent
     }
+
+    pub fn all(&self) -> Vec<&Order> {
+        self.orders
+            .iter()
+            .filter(|o| {
+                o.order_status == OrderStatus::Pending || o.executed_quantity > Decimal::from(0)
+            })
+            .collect()
+    }
 }

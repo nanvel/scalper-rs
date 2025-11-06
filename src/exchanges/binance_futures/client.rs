@@ -255,6 +255,10 @@ impl BinanceClient {
             params.push(("price", price.to_string()));
         };
 
+        if matches!(order.order_type, OrderType::Limit) {
+            params.push(("timeInForce", "GTC".to_string()));
+        };
+
         let resp: BinanceOrder = self.post_signed("/fapi/v1/order", params)?;
 
         let order_status = match resp.status.as_str() {
