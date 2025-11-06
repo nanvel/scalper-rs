@@ -5,7 +5,7 @@ use crate::models::{
     Interval, Message, NewOrder, Order, SharedCandlesState, SharedDomState,
     SharedOpenInterestState, SharedOrderFlowState, Symbol,
 };
-use std::sync::mpsc::Sender;
+use std::sync::{Arc, mpsc::Sender};
 use std::thread;
 use std::time::Duration;
 use tokio::runtime;
@@ -121,18 +121,20 @@ impl Exchange for BinanceFuturesExchange {
     }
 
     fn place_order(&self, new_order: NewOrder) -> () {
+        let client = Arc::clone(&self.client);
         if self.can_trade() {
             thread::spawn(move || {
-                let order = self.client.place_order(new_order).unwrap();
+                let order = client.place_order(new_order).unwrap();
                 self.orders_sender.send(order).unwrap();
             });
         }
     }
 
     fn cancel_order(&self, order: Order) -> () {
+        let client = Arc::clone(&self.client);
         if self.can_trade() {
             thread::spawn(move || {
-                let order = self.client.cancel_order(&order.id).unwrap();
+                let order = client.cancel_order(&order.id).unwrap();
                 self.orders_sender.send(order).unwrap();
             });
         }
