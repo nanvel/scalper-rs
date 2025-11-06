@@ -36,9 +36,9 @@ fn main() {
     let mut alerts_manager = MessageManager::new(messages_receiver);
 
     let mut interval = Interval::M1;
-    let candles_limit = 100;
+    let candles_limit = 200;
     let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
-    let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
+    let shared_dom_state = Arc::new(RwLock::new(DomState::new()));
     let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
     let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
@@ -124,7 +124,15 @@ fn main() {
         if !center.is_some()
             || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
         {
-            if let current_center = shared_dom_state.read().unwrap().center() {
+            let dom = shared_dom_state.read().unwrap();
+            let best_bid = dom.bid();
+            let best_ask = dom.ask();
+            if best_bid.is_some() && best_ask.is_some() {
+                let current_center = Some(
+                    ((*best_bid + *best_ask) / Decimal::from(2) / symbol.tick_size).floor()
+                        * symbol.tick_size,
+                );
+
                 if center.is_some() {
                     if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
                         * px_per_tick.get()

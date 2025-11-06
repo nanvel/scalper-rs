@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
 pub struct DomState {
-    tick_size: Decimal,
     pub bids: BTreeMap<Decimal, Decimal>,
     pub asks: BTreeMap<Decimal, Decimal>,
     pub updated: Timestamp,
@@ -12,9 +11,8 @@ pub struct DomState {
 }
 
 impl DomState {
-    pub fn new(tick_size: Decimal) -> Self {
+    pub fn new() -> Self {
         Self {
-            tick_size,
             bids: BTreeMap::new(),
             asks: BTreeMap::new(),
             updated: Timestamp::now(),
@@ -41,12 +39,6 @@ impl DomState {
         } else {
             self.asks.insert(price, quantity);
         }
-    }
-
-    pub fn center(&self) -> Option<Decimal> {
-        let best_bid = self.bids.keys().next_back()?;
-        let best_ask = self.asks.keys().next()?;
-        Some(((*best_bid + *best_ask) / Decimal::from(2) / self.tick_size).floor() * self.tick_size)
     }
 
     pub fn bid(&self) -> Option<Decimal> {
