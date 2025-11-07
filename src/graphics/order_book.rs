@@ -1,16 +1,16 @@
-use crate::models::{Area, ColorSchema, DomState, Timestamp};
+use crate::models::{Area, ColorSchema, OrderBookState, Timestamp};
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use std::sync::RwLockReadGuard;
 
-pub struct DomRenderer {
+pub struct OrderBookRenderer {
     area: Area,
     padding: i32,
     last_updated: Option<Timestamp>,
 }
 
-impl DomRenderer {
+impl OrderBookRenderer {
     pub fn new(area: Area) -> Self {
         Self {
             area,
@@ -21,7 +21,7 @@ impl DomRenderer {
 
     pub fn render(
         &mut self,
-        dom_state: RwLockReadGuard<DomState>,
+        order_book_state: RwLockReadGuard<OrderBookState>,
         dt: &mut DrawTarget,
         color_schema: &ColorSchema,
         tick_size: Decimal,
@@ -32,12 +32,12 @@ impl DomRenderer {
     ) {
         if !force_redraw {
             if let Some(last_updated) = self.last_updated {
-                if last_updated == dom_state.updated {
+                if last_updated == order_book_state.updated {
                     return;
                 }
             }
         }
-        self.last_updated = Some(dom_state.updated);
+        self.last_updated = Some(order_book_state.updated);
 
         dt.fill_rect(
             self.area.left as f32,
@@ -56,7 +56,7 @@ impl DomRenderer {
         let mut bid_buckets: Vec<Decimal> = vec![Decimal::ZERO; self.area.height as usize];
         let mut ask_buckets: Vec<Decimal> = vec![Decimal::ZERO; self.area.height as usize];
 
-        for (price, quantity) in dom_state.bids.iter() {
+        for (price, quantity) in order_book_state.bids.iter() {
             let price_diff = (center - *price) / tick_size;
             let px_offset = (price_diff * px_per_tick).to_i32().unwrap_or(0);
             let y = central_point + px_offset;
@@ -67,7 +67,7 @@ impl DomRenderer {
             bid_buckets[y as usize] += *quantity;
         }
 
-        for (price, quantity) in dom_state.asks.iter() {
+        for (price, quantity) in order_book_state.asks.iter() {
             let price_diff = (center - *price) / tick_size;
             let px_offset = (price_diff * px_per_tick).to_i32().unwrap_or(0);
             let y = central_point + px_offset;

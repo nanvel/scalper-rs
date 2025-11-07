@@ -1,5 +1,7 @@
 use crate::binance::start_market_stream;
-use crate::models::{Candle, Interval, SharedCandlesState, SharedDomState, SharedOrderFlowState};
+use crate::models::{
+    Candle, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState,
+};
 use reqwest::Client;
 use rust_decimal::Decimal;
 use std::str::FromStr;
@@ -10,7 +12,7 @@ use tokio::time::{Duration, sleep};
 
 pub fn listen_streams(
     candles_state: SharedCandlesState,
-    dom_state: SharedDomState,
+    dom_state: SharedOrderBookState,
     order_flow_state: SharedOrderFlowState,
     symbol: String,
     interval: Interval,

@@ -3,14 +3,14 @@ use rust_decimal::Decimal;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
-pub struct DomState {
+pub struct OrderBookState {
     pub bids: BTreeMap<Decimal, Decimal>,
     pub asks: BTreeMap<Decimal, Decimal>,
     pub updated: Timestamp,
     pub online: bool,
 }
 
-impl DomState {
+impl OrderBookState {
     pub fn new() -> Self {
         Self {
             bids: BTreeMap::new(),
@@ -57,4 +57,4 @@ impl DomState {
     }
 }
 
-pub type SharedDomState = Arc<RwLock<DomState>>;
+pub type SharedOrderBookState = Arc<RwLock<OrderBookState>>;

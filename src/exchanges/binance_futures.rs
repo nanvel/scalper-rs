@@ -3,7 +3,6 @@ mod client;
 mod errors;
 mod exchange;
 mod market_stream;
-mod models;
 mod oi_stream;
 mod orders_stream;
 

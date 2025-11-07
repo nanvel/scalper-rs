@@ -6,7 +6,9 @@ mod use_cases;
 
 use crate::exchanges::ExchangeFactory;
 use crate::models::Orders;
-use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
+use graphics::{
+    CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
+};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{ColorSchema, Config, Interval, Layout, LogManager, PxPerTick};
 use raqote::DrawTarget;
@@ -81,7 +83,7 @@ fn main() {
             std::process::exit(1);
         });
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
-    let mut dom_renderer = DomRenderer::new(layout.dom_area);
+    let mut order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
@@ -109,7 +111,7 @@ fn main() {
         if !center.is_some()
             || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
         {
-            let dom = shared_state.dom.read().unwrap();
+            let dom = shared_state.order_book.read().unwrap();
             let best_bid = dom.bid();
             let best_ask = dom.ask();
             if best_bid.is_some() && best_ask.is_some() {
@@ -139,7 +141,7 @@ fn main() {
                 dt = DrawTarget::new(window_width as i32, window_height as i32);
                 layout = Layout::new(window_width as i32, window_height as i32);
                 candles_renderer = CandlesRenderer::new(layout.candles_area);
-                dom_renderer = DomRenderer::new(layout.dom_area);
+                order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
                 order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
                 status_renderer = StatusRenderer::new(layout.status_area);
 
@@ -239,8 +241,8 @@ fn main() {
                 orders.all(),
                 force_redraw,
             );
-            dom_renderer.render(
-                shared_state.dom.read().unwrap(),
+            order_book_renderer.render(
+                shared_state.order_book.read().unwrap(),
                 &mut dt,
                 &color_schema,
                 symbol.tick_size,
@@ -261,7 +263,7 @@ fn main() {
             );
         }
         {
-            let dom_state = shared_state.dom.read().unwrap();
+            let dom_state = shared_state.order_book.read().unwrap();
             status_renderer.render(
                 interval,
                 size,

@@ -2,9 +2,9 @@ use super::client::BinanceClient;
 use super::market_stream::start_market_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
-    CandlesState, DomState, Interval, Log, NewOrder, OpenInterestState, Order, OrderFlowState,
-    SharedCandlesState, SharedDomState, SharedOpenInterestState, SharedOrderFlowState, SharedState,
-    Symbol,
+    CandlesState, Interval, Log, NewOrder, OpenInterestState, Order, OrderBookState,
+    OrderFlowState, SharedCandlesState, SharedOpenInterestState, SharedOrderBookState,
+    SharedOrderFlowState, SharedState, Symbol,
 };
 use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
 use std::thread;
@@ -33,7 +33,7 @@ impl Exchange for BinanceFuturesExchange {
         &mut self,
     ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), dyn std::error::Error> {
         let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(self.candles_limit)));
-        let shared_dom_state = Arc::new(RwLock::new(DomState::new()));
+        let shared_dom_state = Arc::new(RwLock::new(OrderBookState::new()));
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
         let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
@@ -90,7 +90,7 @@ impl Exchange for BinanceFuturesExchange {
             symbol,
             SharedState {
                 candles: shared_candles_state,
-                dom: shared_dom_state,
+                order_book: shared_dom_state,
                 open_interest: shared_open_interest_state,
                 order_flow: shared_order_flow_state,
             },

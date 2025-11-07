@@ -1,5 +1,7 @@
 use crate::exchanges::base::USER_AGENT;
-use crate::models::{Candle, Interval, SharedCandlesState, SharedDomState, SharedOrderFlowState};
+use crate::models::{
+    Candle, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState,
+};
 use futures_util::stream::StreamExt;
 use reqwest::Client;
 use rust_decimal::Decimal;
@@ -69,7 +71,7 @@ pub async fn start_market_stream(
     symbol: String,
     dom_limit: usize,
     shared_candles_state: SharedCandlesState,
-    shared_dom_state: SharedDomState,
+    shared_dom_state: SharedOrderBookState,
     shared_order_flow_state: SharedOrderFlowState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let http_client = Client::builder().user_agent(USER_AGENT).build()?;
