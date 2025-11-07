@@ -1,7 +1,7 @@
 use crate::binance::BinanceClient;
 use crate::binance::start_account_stream;
 use crate::models::Config;
-use crate::models::messages::Notification;
+use crate::models::logs::Notification;
 use crate::trader::Order;
 use std::sync::mpsc::Sender;
 use std::thread;

@@ -3,23 +3,23 @@ use std::collections::VecDeque;
 use std::sync::mpsc::Receiver;
 
 #[derive(Debug, Clone)]
-pub enum MessageType {
+pub enum LogLevel {
     Info,
     Error,
 }
 
 #[derive(Debug, Clone)]
-pub struct Message {
-    pub message_type: MessageType,
+pub struct Log {
+    pub level: LogLevel,
     pub message: String,
     pub created_at: Timestamp,
     pub duration: u32,
 }
 
-impl Message {
-    pub fn new(message_type: MessageType, message: String, duration: Option<u32>) -> Self {
-        Message {
-            message_type: MessageType::Info,
+impl Log {
+    pub fn new(level: LogLevel, message: String, duration: Option<u32>) -> Self {
+        Log {
+            level: LogLevel::Info,
             message,
             created_at: Timestamp::now(),
             duration: duration.unwrap_or(10),
@@ -33,28 +33,28 @@ impl Message {
     }
 }
 
-pub struct MessageManager {
-    active_messages: VecDeque<Message>,
-    receiver: Receiver<Message>,
+pub struct LogManager {
+    active_logs: VecDeque<Log>,
+    receiver: Receiver<Log>,
 }
 
-impl MessageManager {
-    pub fn new(receiver: Receiver<Message>) -> Self {
-        MessageManager {
-            active_messages: VecDeque::new(),
+impl LogManager {
+    pub fn new(receiver: Receiver<Log>) -> Self {
+        LogManager {
+            active_logs: VecDeque::new(),
             receiver,
         }
     }
 
     pub fn update(&mut self) {
         while let Ok(alert) = self.receiver.try_recv() {
-            self.active_messages.push_back(alert);
+            self.active_logs.push_back(alert);
         }
 
-        self.active_messages.retain(|alert| !alert.is_expired());
+        self.active_logs.retain(|alert| !alert.is_expired());
     }
 
-    pub fn get_active_alerts(&self) -> &VecDeque<Message> {
-        &self.active_messages
+    pub fn get_active_alerts(&self) -> &VecDeque<Log> {
+        &self.active_logs
     }
 }

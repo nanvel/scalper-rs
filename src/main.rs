@@ -8,7 +8,7 @@ use crate::exchanges::ExchangeFactory;
 use crate::models::Orders;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{ColorSchema, Config, Interval, Layout, MessageManager, PxPerTick};
+use models::{ColorSchema, Config, Interval, Layout, LogManager, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
@@ -47,7 +47,7 @@ fn main() {
             std::process::exit(1);
         });
 
-    let mut alerts_manager = MessageManager::new(messages_receiver);
+    let mut alerts_manager = LogManager::new(messages_receiver);
 
     let symbol_slug = &args[1];
 

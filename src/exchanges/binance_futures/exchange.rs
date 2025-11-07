@@ -2,7 +2,7 @@ use super::client::BinanceClient;
 use super::market_stream::start_market_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
-    CandlesState, DomState, Interval, Message, NewOrder, OpenInterestState, Order, OrderFlowState,
+    CandlesState, DomState, Interval, Log, NewOrder, OpenInterestState, Order, OrderFlowState,
     SharedCandlesState, SharedDomState, SharedOpenInterestState, SharedOrderFlowState, SharedState,
     Symbol,
 };
@@ -20,7 +20,7 @@ pub struct BinanceFuturesExchange {
     candles_limit: usize,
     access_key: Option<String>,
     secret_key: Option<String>,
-    messages_sender: Option<Sender<Message>>,
+    messages_sender: Option<Sender<Log>>,
     orders_sender: Option<Sender<Order>>,
     shared_candles_state: Option<SharedCandlesState>,
     client: BinanceClient,
@@ -31,8 +31,7 @@ pub struct BinanceFuturesExchange {
 impl Exchange for BinanceFuturesExchange {
     fn start(
         &mut self,
-    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Message>), dyn std::error::Error>
-    {
+    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), dyn std::error::Error> {
         let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(self.candles_limit)));
         let shared_dom_state = Arc::new(RwLock::new(DomState::new()));
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
