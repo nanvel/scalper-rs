@@ -208,10 +208,11 @@ impl BinanceClient {
     }
 
     pub fn get_candles(&self, interval: &str, limit: usize) -> Result<Vec<Candle>> {
-        let params = vec![
+        let limit_str = limit.to_string();
+        let params: Vec<(&str, &str)> = vec![
             ("symbol", self.symbol.as_str()),
             ("interval", interval),
-            ("limit", limit.to_string().as_str()),
+            ("limit", limit_str.as_str()),
         ];
         let data: Vec<serde_json::Value> = self.get_public("/fapi/v1/klines", Some(&params))?;
 

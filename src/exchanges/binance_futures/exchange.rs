@@ -23,7 +23,7 @@ pub struct BinanceFuturesExchange {
     messages_sender: Option<Sender<Log>>,
     orders_sender: Option<Sender<Order>>,
     shared_candles_state: Option<SharedCandlesState>,
-    client: BinanceClient,
+    client: Arc<BinanceClient>,
     stop_tx: Option<oneshot::Sender<()>>,
     handle: Option<thread::JoinHandle<()>>,
 }
@@ -31,7 +31,8 @@ pub struct BinanceFuturesExchange {
 impl Exchange for BinanceFuturesExchange {
     fn start(
         &mut self,
-    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), dyn std::error::Error> {
+    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>
+    {
         let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(self.candles_limit)));
         let shared_dom_state = Arc::new(RwLock::new(OrderBookState::new()));
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
@@ -138,25 +139,24 @@ impl Exchange for BinanceFuturesExchange {
 
     fn place_order(&self, new_order: NewOrder) -> () {
         if let Some(orders_sender) = &self.orders_sender {
-            let client = Arc::clone(&self.client);
-            if self.can_trade() {
-                thread::spawn(move || {
-                    let order = client.place_order(new_order).unwrap();
-                    orders_sender.send(order).unwrap();
-                });
-            }
+            let client = self.client.clone();
+            let sender_clone = orders_sender.clone();
+            thread::spawn(move || {
+                let order = client.place_order(new_order).unwrap();
+                sender_clone.send(order).unwrap();
+            });
         }
     }
 
     fn cancel_order(&self, order: Order) -> () {
         if let Some(orders_sender) = &self.orders_sender {
-            let client = Arc::clone(&self.client);
-            if self.can_trade() {
-                thread::spawn(move || {
-                    let order = client.cancel_order(&order.id).unwrap();
-                    orders_sender.send(order).unwrap();
-                });
-            }
+            let client = self.client.clone();
+            let order_id = order.id.clone();
+            let sender_clone = orders_sender.clone();
+            thread::spawn(move || {
+                let order = client.cancel_order(&order_id).unwrap();
+                sender_clone.send(order).unwrap();
+            });
         }
     }
 }
@@ -169,7 +169,11 @@ impl BinanceFuturesExchange {
         access_key: Option<String>,
         secret_key: Option<String>,
     ) -> Self {
-        let client = BinanceClient::new(symbol.clone(), access_key.clone(), secret_key.clone());
+        let client = Arc::new(BinanceClient::new(
+            symbol.clone(),
+            access_key.clone(),
+            secret_key.clone(),
+        ));
 
         Self {
             name: "Binance USD Futures",

@@ -4,7 +4,7 @@ use std::sync::mpsc::Receiver;
 pub trait Exchange: Send + Sync {
     fn start(
         &mut self,
-    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), dyn std::error::Error>;
+    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>;
 
     fn stop(&self) -> ();
 

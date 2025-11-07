@@ -12,15 +12,15 @@ impl ExchangeFactory {
         interval: Interval,
         candles_limit: usize,
         config: &Config,
-    ) -> Result<dyn Exchange, ExchangeError> {
+    ) -> Result<Box<dyn Exchange>, ExchangeError> {
         match name {
-            "binance_usd_futures" => Ok(BinanceFuturesExchange::new(
+            "binance_usd_futures" => Ok(Box::new(BinanceFuturesExchange::new(
                 symbol,
                 interval,
                 candles_limit,
                 config.binance_access_key.clone(),
                 config.binance_secret_key.clone(),
-            )),
+            ))),
             _ => Err(ExchangeError::UnknownExchange(name.to_string())),
         }
     }
