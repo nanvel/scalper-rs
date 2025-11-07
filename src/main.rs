@@ -120,7 +120,8 @@ fn main() {
         {
             if bid.is_some() && ask.is_some() {
                 let current_center = Some(
-                    ((bid + ask) / Decimal::from(2) / symbol.tick_size).floor() * symbol.tick_size,
+                    ((bid.unwrap() + ask.unwrap()) / Decimal::from(2) / symbol.tick_size).floor()
+                        * symbol.tick_size,
                 );
 
                 if center.is_some() {

@@ -1,8 +1,6 @@
 use crate::binance::BinanceClient;
 use crate::binance::start_account_stream;
-use crate::models::Config;
-use crate::models::logs::Notification;
-use crate::trader::Order;
+use crate::models::{Config, Log, Order};
 use std::sync::mpsc::Sender;
 use std::thread;
 use tokio::runtime;
@@ -10,7 +8,7 @@ use tokio::runtime;
 pub fn listen_orders(
     config: &Config,
     symbol: String,
-    alerts_sender: Sender<Notification>,
+    alerts_sender: Sender<Log>,
     orders_sender: Sender<Order>,
 ) {
     let client = BinanceClient::new(

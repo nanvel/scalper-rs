@@ -1,6 +1,4 @@
-use crate::models::Timestamp;
-use crate::models::logs::{Notification, NotificationLevel};
-use crate::trader;
+use crate::models::{Log, LogLevel, Order, OrderSide, OrderStatus, OrderType, Timestamp};
 use futures_util::stream::StreamExt;
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -59,8 +57,8 @@ impl ExecutionReport {
 pub async fn start_account_stream(
     listen_key: String,
     symbol: String,
-    alerts_sender: Sender<Notification>,
-    orders_sender: Sender<trader::Order>,
+    alerts_sender: Sender<Log>,
+    orders_sender: Sender<Order>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ws_url = format!("wss://fstream.binance.com/ws/{}", listen_key);
     let (ws_stream, _) = connect_async(ws_url).await?;
@@ -85,34 +83,32 @@ pub async fn start_account_stream(
                                 match &er.current_order_status {
                                     Some(s) if s.eq("FILLED") => {
                                         alerts_sender
-                                            .send(Notification::new(
-                                                NotificationLevel::Info,
+                                            .send(Log::new(
+                                                LogLevel::Info,
                                                 format!("Filled {:?}", er.order_id),
                                                 Some(10),
                                             ))
                                             .ok();
                                         let order_side = match &er.side {
-                                            Some(s) if s.eq("BUY") => trader::OrderSide::Buy,
-                                            Some(s) if s.eq("SELL") => trader::OrderSide::Sell,
+                                            Some(s) if s.eq("BUY") => OrderSide::Buy,
+                                            Some(s) if s.eq("SELL") => OrderSide::Sell,
                                             _ => panic!("Invalid order side"),
                                         };
                                         let order_type = match &er.order_type {
-                                            Some(t) if t.eq("MARKET") => trader::OrderType::Market,
-                                            Some(t) if t.eq("LIMIT") => trader::OrderType::Limit,
-                                            Some(t) if t.eq("STOP_MARKET") => {
-                                                trader::OrderType::Stop
-                                            }
+                                            Some(t) if t.eq("MARKET") => OrderType::Market,
+                                            Some(t) if t.eq("LIMIT") => OrderType::Limit,
+                                            Some(t) if t.eq("STOP_MARKET") => OrderType::Stop,
                                             _ => panic!("Invalid order type"),
                                         };
                                         let order_status = match &er.current_order_status {
-                                            Some(s) if s.eq("NEW") => trader::OrderStatus::Pending,
+                                            Some(s) if s.eq("NEW") => OrderStatus::Pending,
                                             Some(s) if s.eq("PARTIALLY_FILLED") => {
-                                                trader::OrderStatus::Pending
+                                                OrderStatus::Pending
                                             }
-                                            _ => trader::OrderStatus::Filled,
+                                            _ => OrderStatus::Filled,
                                         };
                                         orders_sender
-                                            .send(trader::Order::new(
+                                            .send(Order::new(
                                                 er.order_id.unwrap_or_default().to_string(),
                                                 order_type,
                                                 order_side,

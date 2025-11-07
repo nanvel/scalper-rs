@@ -344,14 +344,14 @@ impl CandlesRenderer {
 
         // orders
         for order in orders {
-            let color = match order.side {
+            let color = match order.order_side {
                 OrderSide::Buy => color_schema.volume_buy,
                 OrderSide::Sell => color_schema.volume_sell,
             };
 
-            if order.is_closed() {
+            if order.is_filled() {
                 // solid triangle
-                let y = price_to_y(order.avg_price);
+                let y = price_to_y(order.average_price);
                 let mut pb = PathBuilder::new();
                 pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
                 pb.line_to(
@@ -366,7 +366,7 @@ impl CandlesRenderer {
                 let path = pb.finish();
                 dt.fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
             } else {
-                let y = price_to_y(order.avg_price);
+                let y = price_to_y(order.average_price);
                 let mut pb = PathBuilder::new();
                 pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
                 pb.line_to(

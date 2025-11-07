@@ -107,34 +107,32 @@ impl Exchange for BinanceFuturesExchange {
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
         }
+        self.stop_tx = None;
+        self.handle = None;
     }
 
     fn set_interval(&mut self, interval: Interval) -> () {
-        if let Some(client) = &self.client {
-            let interval_str = match interval {
-                Interval::M1 => "1m",
-                Interval::M5 => "5m",
-                Interval::M15 => "15m",
-                Interval::H1 => "1h",
-            };
+        let interval_str = match interval {
+            Interval::M1 => "1m",
+            Interval::M5 => "5m",
+            Interval::M15 => "15m",
+            Interval::H1 => "1h",
+        };
 
-            let candles = client
-                .get_candles(&interval_str, self.candles_limit)
-                .unwrap_or_else(|err| {
-                    eprintln!("Error fetching candles: {}", err);
-                    return;
-                });
+        let candles = self
+            .client
+            .get_candles(&interval_str, self.candles_limit)
+            .unwrap();
 
-            if let Some(shared_candles_state) = self.shared_candles_state.as_ref() {
-                let mut buffer = shared_candles_state.write().unwrap();
-                buffer.clear();
-                for candle in candles {
-                    buffer.push(candle);
-                }
+        if let Some(shared_candles_state) = self.shared_candles_state.as_ref() {
+            let mut buffer = shared_candles_state.write().unwrap();
+            buffer.clear();
+            for candle in candles {
+                buffer.push(candle);
             }
-
-            self.interval = interval;
         }
+
+        self.interval = interval;
     }
 
     fn place_order(&self, new_order: NewOrder) -> () {

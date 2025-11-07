@@ -3,7 +3,7 @@ use std::fmt;
 
 #[derive(Debug, Deserialize)]
 pub enum BinanceError {
-    HttpError(reqwest::Error),
+    HttpError(String),
     AuthError(String),
     ApiError { code: i32, msg: String },
     ParseError(String),
@@ -14,7 +14,7 @@ pub enum BinanceError {
 impl fmt::Display for BinanceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BinanceError::HttpError(e) => write!(f, "HTTP error: {}", e),
+            BinanceError::HttpError(msg) => write!(f, "HTTP error: {}", msg),
             BinanceError::AuthError(msg) => write!(f, "Auth error: {}", msg),
             BinanceError::ApiError { code, msg } => write!(f, "API error {}: {}", code, msg),
             BinanceError::ParseError(msg) => write!(f, "Parse error: {}", msg),
@@ -28,7 +28,7 @@ impl std::error::Error for BinanceError {}
 
 impl From<reqwest::Error> for BinanceError {
     fn from(err: reqwest::Error) -> Self {
-        BinanceError::HttpError(err)
+        BinanceError::HttpError(err.to_string())
     }
 }
 

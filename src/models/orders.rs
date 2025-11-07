@@ -1,5 +1,6 @@
 use crate::models::Timestamp;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::Zero;
 
 #[derive(Debug, Clone)]
 pub enum OrderSide {
@@ -67,6 +68,10 @@ impl Order {
             commission,
             timestamp,
         }
+    }
+
+    pub fn is_filled(&self) -> bool {
+        self.order_status == OrderStatus::Filled && self.executed_quantity > Decimal::ZERO
     }
 }
 

@@ -6,7 +6,7 @@ pub trait Exchange: Send + Sync {
         &mut self,
     ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>;
 
-    fn stop(&self) -> ();
+    fn stop(&mut self) -> ();
 
     fn set_interval(&mut self, interval: Interval) -> ();
 

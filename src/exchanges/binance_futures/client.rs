@@ -278,7 +278,7 @@ impl BinanceClient {
             price: resp.price,
             average_price: resp.avg_price,
             commission: resp.commission(),
-            timestamp: Timestamp(resp.update_time / 1000),
+            timestamp: Timestamp::from(resp.update_time / 1000),
         })
     }
 
@@ -312,7 +312,7 @@ impl BinanceClient {
             price: resp.price,
             average_price: resp.avg_price,
             commission: resp.commission(),
-            timestamp: Timestamp(resp.update_time / 1000),
+            timestamp: Timestamp::from(resp.update_time / 1000),
         })
     }
 
@@ -330,7 +330,7 @@ pub struct ApiError {
 
 #[derive(Deserialize)]
 pub struct ExchangeInfo {
-    pub symbols: Vec<crate::binance::types::SymbolInfo>,
+    pub symbols: Vec<SymbolInfo>,
 }
 
 #[derive(Deserialize)]
