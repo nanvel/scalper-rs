@@ -49,7 +49,7 @@ fn main() {
             std::process::exit(1);
         });
 
-    let mut alerts_manager = LogManager::new(messages_receiver);
+    let mut logs_manager = LogManager::new(messages_receiver);
 
     let symbol_slug = &args[1];
 
@@ -95,29 +95,32 @@ fn main() {
     let mut px_per_tick = PxPerTick::default();
     let mut force_redraw = true;
     let mut left_was_pressed = false;
+    let mut bid: Option<Decimal> = None;
+    let mut ask: Option<Decimal> = None;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
                 orders.on_order(value);
-                dbg!("Received: {}", value);
             }
             Err(mpsc::TryRecvError::Empty) => {}
             Err(mpsc::TryRecvError::Disconnected) => {}
         };
 
-        alerts_manager.update();
+        {
+            let order_book = shared_state.order_book.read().unwrap();
+            bid = order_book.bid();
+            ask = order_book.ask();
+        }
+
+        logs_manager.update();
 
         // pause recenter if ctrl is pressed
         if !center.is_some()
             || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
         {
-            let dom = shared_state.order_book.read().unwrap();
-            let best_bid = dom.bid();
-            let best_ask = dom.ask();
-            if best_bid.is_some() && best_ask.is_some() {
+            if bid.is_some() && ask.is_some() {
                 let current_center = Some(
-                    ((*best_bid + *best_ask) / Decimal::from(2) / symbol.tick_size).floor()
-                        * symbol.tick_size,
+                    ((bid + ask) / Decimal::from(2) / symbol.tick_size).floor() * symbol.tick_size,
                 );
 
                 if center.is_some() {
@@ -262,19 +265,16 @@ fn main() {
                 force_redraw,
             );
         }
-        {
-            let dom_state = shared_state.order_book.read().unwrap();
-            status_renderer.render(
-                interval,
-                size,
-                &mut dt,
-                &text_renderer,
-                &color_schema,
-                orders.pnl(dom_state.bid(), dom_state.ask()),
-                orders.base_balance(),
-            );
-        }
-        let active_alerts = alerts_manager.get_active_alerts();
+        status_renderer.render(
+            interval,
+            size,
+            &mut dt,
+            &text_renderer,
+            &color_schema,
+            orders.pnl(bid, ask),
+            orders.base_balance(),
+        );
+        let active_alerts = logs_manager.get_active_alerts();
         if active_alerts.is_empty() {
             window.set_title(&format!("Scalper - {}", symbol.slug));
         } else {
