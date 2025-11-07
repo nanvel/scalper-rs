@@ -2,7 +2,6 @@ mod binance;
 mod exchanges;
 mod graphics;
 mod models;
-mod use_cases;
 
 use crate::exchanges::ExchangeFactory;
 use crate::models::Orders;

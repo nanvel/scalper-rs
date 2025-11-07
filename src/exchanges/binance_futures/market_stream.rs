@@ -68,7 +68,7 @@ struct AggTradeEvent {
 }
 
 pub async fn start_market_stream(
-    symbol: String,
+    symbol: &String,
     dom_limit: usize,
     shared_candles_state: SharedCandlesState,
     shared_dom_state: SharedOrderBookState,

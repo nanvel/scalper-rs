@@ -1,5 +1,7 @@
 use super::client::BinanceClient;
 use super::market_stream::start_market_stream;
+use super::open_interest_stream::start_open_interest_stream;
+use super::orders_stream::start_orders_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
     CandlesState, Interval, Log, NewOrder, OpenInterestState, Order, OrderBookState,
@@ -20,7 +22,7 @@ pub struct BinanceFuturesExchange {
     candles_limit: usize,
     access_key: Option<String>,
     secret_key: Option<String>,
-    messages_sender: Option<Sender<Log>>,
+    logs_sender: Option<Sender<Log>>,
     orders_sender: Option<Sender<Order>>,
     shared_candles_state: Option<SharedCandlesState>,
     client: Arc<BinanceClient>,
@@ -34,17 +36,22 @@ impl Exchange for BinanceFuturesExchange {
     ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>
     {
         let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(self.candles_limit)));
-        let shared_dom_state = Arc::new(RwLock::new(OrderBookState::new()));
+        let shared_order_book_state = Arc::new(RwLock::new(OrderBookState::new()));
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
         let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
-        let (messages_sender, messages_receiver) = mpsc::channel();
+        let (logs_sender, logs_receiver) = mpsc::channel();
         let (orders_sender, orders_receiver) = mpsc::channel();
-        self.messages_sender = Some(messages_sender);
+        self.logs_sender = Some(logs_sender);
         self.orders_sender = Some(orders_sender);
         self.shared_candles_state = Some(shared_candles_state.clone());
 
         let symbol = self.client.get_symbol()?;
+        let listen_key = if let Some(key) = &self.access_key {
+            Some(self.client.get_listen_key().unwrap())
+        } else {
+            None
+        };
 
         self.set_interval(self.interval.clone());
 
@@ -52,8 +59,12 @@ impl Exchange for BinanceFuturesExchange {
 
         let symbol_clone = self.symbol.clone();
         let candles_clone = shared_candles_state.clone();
-        let dom_clone = shared_dom_state.clone();
+        let order_book_clone = shared_order_book_state.clone();
         let order_flow_clone = shared_order_flow_state.clone();
+        let open_interest_clone = shared_open_interest_state.clone();
+
+        let logs_sender_clone = self.logs_sender.clone().unwrap();
+        let orders_sender_clone = self.orders_sender.clone().unwrap();
         let handle = thread::spawn(move || {
             let rt = runtime::Builder::new_multi_thread()
                 .worker_threads(1)
@@ -64,14 +75,34 @@ impl Exchange for BinanceFuturesExchange {
             rt.block_on(async move {
                 tokio::select! {
                     res = start_market_stream(
-                        symbol_clone,
+                        &symbol_clone,
                         500,
                         candles_clone,
-                        dom_clone,
+                        order_book_clone,
                         order_flow_clone,
                     ) => {
                         if let Err(e) = res {
                             eprintln!("Market stream error: {:?}", e);
+                        }
+                    }
+
+                    res = start_open_interest_stream(
+                        open_interest_clone,
+                        &symbol_clone,
+                    ) => {
+                        if let Err(e) = res {
+                            eprintln!("Open interest stream error: {:?}", e);
+                        }
+                    }
+
+                    res = start_orders_stream(
+                        listen_key,
+                        &symbol_clone,
+                        logs_sender_clone,
+                        orders_sender_clone,
+                    ) => {
+                        if let Err(e) = res {
+                            eprintln!("Orders stream error: {:?}", e);
                         }
                     }
 
@@ -91,12 +122,12 @@ impl Exchange for BinanceFuturesExchange {
             symbol,
             SharedState {
                 candles: shared_candles_state,
-                order_book: shared_dom_state,
+                order_book: shared_order_book_state,
                 open_interest: shared_open_interest_state,
                 order_flow: shared_order_flow_state,
             },
             orders_receiver,
-            messages_receiver,
+            logs_receiver,
         ))
     }
 
@@ -180,7 +211,7 @@ impl BinanceFuturesExchange {
             candles_limit,
             access_key,
             secret_key,
-            messages_sender: None,
+            logs_sender: None,
             orders_sender: None,
             shared_candles_state: None,
             client,
