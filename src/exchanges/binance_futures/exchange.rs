@@ -2,10 +2,11 @@ use super::client::BinanceClient;
 use super::market_stream::start_market_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
-    Interval, Message, NewOrder, Order, SharedCandlesState, SharedDomState,
-    SharedOpenInterestState, SharedOrderFlowState, Symbol,
+    CandlesState, DomState, Interval, Message, NewOrder, OpenInterestState, Order, OrderFlowState,
+    SharedCandlesState, SharedDomState, SharedOpenInterestState, SharedOrderFlowState, SharedState,
+    Symbol,
 };
-use std::sync::{Arc, mpsc::Sender};
+use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
 use std::thread;
 use std::time::Duration;
 use tokio::runtime;
@@ -16,29 +17,43 @@ pub struct BinanceFuturesExchange {
     name: &'static str,
     symbol: String,
     interval: Interval,
-    candles: SharedCandlesState,
-    dom: SharedDomState,
-    open_interest: SharedOpenInterestState,
-    order_flow: SharedOrderFlowState,
-    messages_sender: Sender<Message>,
-    orders_sender: Sender<Order>,
+    candles_limit: usize,
     access_key: Option<String>,
     secret_key: Option<String>,
+    messages_sender: Option<Sender<Message>>,
+    orders_sender: Option<Sender<Order>>,
+    shared_candles_state: Option<SharedCandlesState>,
     client: BinanceClient,
     stop_tx: Option<oneshot::Sender<()>>,
     handle: Option<thread::JoinHandle<()>>,
 }
 
 impl Exchange for BinanceFuturesExchange {
-    fn start(&mut self) -> Result<Symbol, dyn std::error::Error> {
+    fn start(
+        &mut self,
+    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Message>), dyn std::error::Error>
+    {
+        let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(self.candles_limit)));
+        let shared_dom_state = Arc::new(RwLock::new(DomState::new()));
+        let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
+        let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
+
+        let (messages_sender, messages_receiver) = mpsc::channel();
+        let (orders_sender, orders_receiver) = mpsc::channel();
+        self.messages_sender = Some(messages_sender);
+        self.orders_sender = Some(orders_sender);
+        self.shared_candles_state = Some(shared_candles_state.clone());
+
+        let symbol = self.client.get_symbol()?;
+
         self.set_interval(self.interval.clone());
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let symbol_clone = self.symbol.clone();
-        let candles_clone = self.candles.clone();
-        let dom_clone = self.dom.clone();
-        let order_flow_clone = self.order_flow.clone();
+        let candles_clone = shared_candles_state.clone();
+        let dom_clone = shared_dom_state.clone();
+        let order_flow_clone = shared_order_flow_state.clone();
         let handle = thread::spawn(move || {
             let rt = runtime::Builder::new_multi_thread()
                 .worker_threads(1)
@@ -71,6 +86,18 @@ impl Exchange for BinanceFuturesExchange {
 
         self.stop_tx = Some(shutdown_tx);
         self.handle = Some(handle);
+
+        Ok((
+            symbol,
+            SharedState {
+                candles: shared_candles_state,
+                dom: shared_dom_state,
+                open_interest: shared_open_interest_state,
+                order_flow: shared_order_flow_state,
+            },
+            orders_receiver,
+            messages_receiver,
+        ))
     }
 
     fn stop(&mut self) -> () {
@@ -82,10 +109,6 @@ impl Exchange for BinanceFuturesExchange {
         }
     }
 
-    fn can_trade(&self) -> bool {
-        self.access_key.is_some() && self.secret_key.is_some()
-    }
-
     fn set_interval(&mut self, interval: Interval) -> () {
         if let Some(client) = &self.client {
             let interval_str = match interval {
@@ -95,21 +118,15 @@ impl Exchange for BinanceFuturesExchange {
                 Interval::H1 => "1h",
             };
 
-            let mut limit = 200;
-            {
-                let candles_buffer = self.candles.read().unwrap();
-                limit = candles_buffer.capacity();
-            }
-
             let candles = client
-                .get_candles(&interval_str, limit)
+                .get_candles(&interval_str, self.candles_limit)
                 .unwrap_or_else(|err| {
                     eprintln!("Error fetching candles: {}", err);
                     return;
                 });
 
-            {
-                let mut buffer = self.candles.write().unwrap();
+            if let Some(shared_candles_state) = self.shared_candles_state.as_ref() {
+                let mut buffer = shared_candles_state.write().unwrap();
                 buffer.clear();
                 for candle in candles {
                     buffer.push(candle);
@@ -121,22 +138,26 @@ impl Exchange for BinanceFuturesExchange {
     }
 
     fn place_order(&self, new_order: NewOrder) -> () {
-        let client = Arc::clone(&self.client);
-        if self.can_trade() {
-            thread::spawn(move || {
-                let order = client.place_order(new_order).unwrap();
-                self.orders_sender.send(order).unwrap();
-            });
+        if let Some(orders_sender) = &self.orders_sender {
+            let client = Arc::clone(&self.client);
+            if self.can_trade() {
+                thread::spawn(move || {
+                    let order = client.place_order(new_order).unwrap();
+                    orders_sender.send(order).unwrap();
+                });
+            }
         }
     }
 
     fn cancel_order(&self, order: Order) -> () {
-        let client = Arc::clone(&self.client);
-        if self.can_trade() {
-            thread::spawn(move || {
-                let order = client.cancel_order(&order.id).unwrap();
-                self.orders_sender.send(order).unwrap();
-            });
+        if let Some(orders_sender) = &self.orders_sender {
+            let client = Arc::clone(&self.client);
+            if self.can_trade() {
+                thread::spawn(move || {
+                    let order = client.cancel_order(&order.id).unwrap();
+                    orders_sender.send(order).unwrap();
+                });
+            }
         }
     }
 }
@@ -145,12 +166,7 @@ impl BinanceFuturesExchange {
     pub fn new(
         symbol: String,
         interval: Interval,
-        candles: SharedCandlesState,
-        dom: SharedDomState,
-        open_interest: SharedOpenInterestState,
-        order_flow: SharedOrderFlowState,
-        messages_sender: Sender<Message>,
-        orders_sender: Sender<Order>,
+        candles_limit: usize,
         access_key: Option<String>,
         secret_key: Option<String>,
     ) -> Self {
@@ -160,14 +176,12 @@ impl BinanceFuturesExchange {
             name: "Binance USD Futures",
             symbol,
             interval,
-            candles,
-            dom,
-            open_interest,
-            order_flow,
-            messages_sender,
-            orders_sender,
+            candles_limit,
             access_key,
             secret_key,
+            messages_sender: None,
+            orders_sender: None,
+            shared_candles_state: None,
             client,
             stop_tx: None,
             handle: None,

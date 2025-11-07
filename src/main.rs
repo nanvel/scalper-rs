@@ -8,14 +8,11 @@ use crate::exchanges::ExchangeFactory;
 use crate::models::Orders;
 use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{
-    CandlesState, ColorSchema, Config, DomState, Interval, Layout, MessageManager,
-    OpenInterestState, OrderFlowState, PxPerTick,
-};
+use models::{ColorSchema, Config, Interval, Layout, MessageManager, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
-use std::sync::{Arc, RwLock, mpsc};
+use std::sync::mpsc;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -31,27 +28,12 @@ fn main() {
         std::process::exit(1);
     });
 
-    let (messages_sender, messages_receiver) = mpsc::channel();
-    let (orders_sender, orders_receiver) = mpsc::channel();
-    let mut alerts_manager = MessageManager::new(messages_receiver);
-
     let mut interval = Interval::M1;
-    let candles_limit = 200;
-    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
-    let shared_dom_state = Arc::new(RwLock::new(DomState::new()));
-    let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
-    let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
-
     let mut exchange = ExchangeFactory::create(
         "binance_usd_futures",
         args[1].clone(),
         interval,
-        shared_candles_state.clone(),
-        shared_dom_state.clone(),
-        shared_open_interest_state.clone(),
-        shared_order_flow_state.clone(),
-        messages_sender,
-        orders_sender,
+        200,
         &config,
     )
     .unwrap_or_else(|err| {
@@ -59,10 +41,13 @@ fn main() {
         std::process::exit(1);
     });
 
-    let symbol = exchange.start().unwrap_or_else(|err| {
-        eprintln!("Error starting streams: {}", err);
-        std::process::exit(1);
-    });
+    let (symbol, shared_state, orders_receiver, messages_receiver) =
+        exchange.start().unwrap_or_else(|err| {
+            eprintln!("Error starting streams: {}", err);
+            std::process::exit(1);
+        });
+
+    let mut alerts_manager = MessageManager::new(messages_receiver);
 
     let symbol_slug = &args[1];
 
@@ -124,7 +109,7 @@ fn main() {
         if !center.is_some()
             || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
         {
-            let dom = shared_dom_state.read().unwrap();
+            let dom = shared_state.dom.read().unwrap();
             let best_bid = dom.bid();
             let best_ask = dom.ask();
             if best_bid.is_some() && best_ask.is_some() {
@@ -243,8 +228,8 @@ fn main() {
 
         if let Some(center_price) = center {
             candles_renderer.render(
-                shared_candles_state.read().unwrap(),
-                shared_open_interest_state.read().unwrap(),
+                shared_state.candles.read().unwrap(),
+                shared_state.open_interest.read().unwrap(),
                 &mut dt,
                 &text_renderer,
                 &color_schema,
@@ -255,7 +240,7 @@ fn main() {
                 force_redraw,
             );
             dom_renderer.render(
-                shared_dom_state.read().unwrap(),
+                shared_state.dom.read().unwrap(),
                 &mut dt,
                 &color_schema,
                 symbol.tick_size,
@@ -265,7 +250,7 @@ fn main() {
                 force_redraw,
             );
             order_flow_renderer.render(
-                shared_order_flow_state.read().unwrap(),
+                shared_state.order_flow.read().unwrap(),
                 &mut dt,
                 &color_schema,
                 symbol.tick_size,
@@ -276,7 +261,7 @@ fn main() {
             );
         }
         {
-            let dom_state = shared_dom_state.read().unwrap();
+            let dom_state = shared_state.dom.read().unwrap();
             status_renderer.render(
                 interval,
                 size,

@@ -10,6 +10,7 @@ mod open_interest;
 mod order_flow;
 mod orders;
 mod px_per_tick;
+mod shared_state;
 mod symbol;
 mod timestamp;
 
@@ -25,5 +26,6 @@ pub use open_interest::{OpenInterestState, SharedOpenInterestState};
 pub use order_flow::{OrderFlowState, SharedOrderFlowState};
 pub use orders::{NewOrder, Order, OrderSide, OrderStatus, OrderType, Orders};
 pub use px_per_tick::PxPerTick;
+pub use shared_state::SharedState;
 pub use symbol::Symbol;
 pub use timestamp::Timestamp;
