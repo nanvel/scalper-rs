@@ -71,7 +71,7 @@ impl BinanceClient {
         }
 
         let response = self.client.get(&url).send()?;
-        self.handle_response(response)?
+        self.handle_response(response)
     }
 
     fn get_signed<T: DeserializeOwned>(
