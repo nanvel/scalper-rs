@@ -315,11 +315,6 @@ impl BinanceClient {
             timestamp: Timestamp::from_milliseconds(resp.update_time),
         })
     }
-
-    pub fn get_listen_key(&self) -> Result<String> {
-        let response: ListenKeyResponse = self.post_signed("/fapi/v1/listenKey", vec![])?;
-        Ok(response.listen_key)
-    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -390,10 +385,4 @@ impl BinanceOrder {
         };
         self.executed_qty * self.price * rate
     }
-}
-
-#[derive(serde::Deserialize)]
-pub struct ListenKeyResponse {
-    #[serde(rename = "listenKey")]
-    pub listen_key: String,
 }
