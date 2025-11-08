@@ -41,6 +41,10 @@ impl CandlesState {
         }
     }
 
+    pub fn capacity(&self) -> usize {
+        self.capacity
+    }
+
     pub fn push(&mut self, candle: Candle) {
         if let Some(last_candle) = self.last() {
             if last_candle.open_time == candle.open_time {

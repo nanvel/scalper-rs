@@ -1,25 +1,20 @@
+use serde::Deserialize;
 use std::fmt;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub enum BinanceError {
-    /// HTTP request failed
-    HttpError(reqwest::Error),
-    /// Invalid API credentials
+    HttpError(String),
     AuthError(String),
-    /// API returned an error
     ApiError { code: i32, msg: String },
-    /// Failed to parse response
     ParseError(String),
-    /// WebSocket error
     WebSocketError(String),
-    /// Invalid parameters
     InvalidParameter(String),
 }
 
 impl fmt::Display for BinanceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            BinanceError::HttpError(e) => write!(f, "HTTP error: {}", e),
+            BinanceError::HttpError(msg) => write!(f, "HTTP error: {}", msg),
             BinanceError::AuthError(msg) => write!(f, "Auth error: {}", msg),
             BinanceError::ApiError { code, msg } => write!(f, "API error {}: {}", code, msg),
             BinanceError::ParseError(msg) => write!(f, "Parse error: {}", msg),
@@ -33,7 +28,7 @@ impl std::error::Error for BinanceError {}
 
 impl From<reqwest::Error> for BinanceError {
     fn from(err: reqwest::Error) -> Self {
-        BinanceError::HttpError(err)
+        BinanceError::HttpError(err.to_string())
     }
 }
 

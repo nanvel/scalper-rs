@@ -10,17 +10,29 @@ impl Timestamp {
         let now = SystemTime::now();
         let duration = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
 
-        Timestamp(duration.as_secs())
+        Timestamp(duration.as_millis() as u64)
+    }
+
+    pub fn from_seconds(seconds: u64) -> Self {
+        Timestamp(seconds * 1000)
+    }
+
+    pub fn from_milliseconds(mills: u64) -> Self {
+        Timestamp(mills)
     }
 
     pub fn seconds(&self) -> u64 {
+        self.0 / 1000
+    }
+
+    pub fn milliseconds(&self) -> u64 {
         self.0
     }
 }
 
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}s", self.0)
+        write!(f, "{}ms", self.0)
     }
 }
 
@@ -42,20 +54,20 @@ mod tests {
 
     #[test]
     fn test_timestamp_display() {
-        let ts = Timestamp::from(1625079600);
-        assert_eq!(format!("{}", ts), "1625079600s".to_string());
+        let ts = Timestamp::from(1625079600000);
+        assert_eq!(format!("{}", ts), "1625079600000ms".to_string());
     }
 
     #[test]
     fn test_timestamp_from_u64() {
-        let ts: Timestamp = 1625079600u64.into();
-        assert_eq!(ts.0, 1625079600);
+        let ts: Timestamp = 1625079600000u64.into();
+        assert_eq!(ts.0, 1625079600000);
     }
 
     #[test]
     fn test_timestamp_to_u64() {
-        let ts = Timestamp::from(1625079600);
+        let ts = Timestamp::from(1625079600000);
         let value: u64 = ts.into();
-        assert_eq!(value, 1625079600);
+        assert_eq!(value, 1625079600000);
     }
 }

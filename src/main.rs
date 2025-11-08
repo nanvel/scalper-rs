@@ -1,56 +1,20 @@
-mod binance;
+mod exchanges;
 mod graphics;
 mod models;
-mod notifications;
-mod use_cases;
 
-use binance::BinanceClient;
-use graphics::{CandlesRenderer, DomRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer};
+use crate::exchanges::ExchangeFactory;
+use crate::models::{NewOrder, Orders};
+use graphics::{
+    CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
+};
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
-    CandlesState, ColorSchema, Config, DomState, Interval, Layout, OpenInterestState,
-    OrderFlowState, PxPerTick, Trader,
+    ColorSchema, Config, Interval, Layout, LogManager, OrderSide, OrderType, PxPerTick, Sizes,
 };
-use notifications::AlertManager;
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
-use std::sync::{Arc, RwLock, mpsc::channel};
-use tokio::runtime;
-use use_cases::listen_open_interest::listen_open_interest;
-use use_cases::listen_orders::listen_orders;
-use use_cases::listen_streams::listen_streams;
-
-fn restart_streams(
-    handle: std::thread::JoinHandle<()>,
-    stop_tx: tokio::sync::oneshot::Sender<()>,
-    shared_candles_state: Arc<RwLock<CandlesState>>,
-    shared_dom_state: Arc<RwLock<DomState>>,
-    shared_order_flow_state: Arc<RwLock<OrderFlowState>>,
-    symbol_slug: String,
-    interval: Interval,
-    candles_limit: usize,
-) -> (
-    std::thread::JoinHandle<()>,
-    tokio::sync::oneshot::Sender<()>,
-) {
-    // best-effort shutdown of previous listener
-    let _ = stop_tx.send(());
-    let _ = handle.join();
-
-    shared_candles_state.write().unwrap().clear();
-    shared_dom_state.write().unwrap().clear();
-
-    listen_streams(
-        shared_candles_state,
-        shared_dom_state,
-        shared_order_flow_state,
-        symbol_slug,
-        interval,
-        candles_limit,
-        500,
-    )
-}
+use std::sync::mpsc;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -66,35 +30,34 @@ fn main() {
         std::process::exit(1);
     });
 
-    let rt = runtime::Builder::new_multi_thread()
-        .worker_threads(1)
-        .enable_all()
-        .build()
-        .expect("failed to build tokio runtime");
+    let mut interval = Interval::M1;
+    let mut exchange = ExchangeFactory::create(
+        "binance_usd_futures",
+        args[1].clone(),
+        interval,
+        200,
+        &config,
+    )
+    .unwrap_or_else(|err| {
+        eprintln!("Error creating exchange: {}", err);
+        std::process::exit(1);
+    });
 
-    let client = BinanceClient::new(
-        config.binance_access_key.clone(),
-        config.binance_secret_key.clone(),
-    );
-    let mut trader = Trader::new();
+    let (symbol, shared_state, orders_receiver, messages_receiver) =
+        exchange.start().unwrap_or_else(|err| {
+            eprintln!("Error starting streams: {}", err);
+            std::process::exit(1);
+        });
+
+    let mut logs_manager = LogManager::new(messages_receiver);
 
     let symbol_slug = &args[1];
-    let symbol = rt
-        .block_on(client.get_symbol(&symbol_slug))
-        .unwrap_or_else(|err| {
-            eprintln!("Error loading symbol {}: {}", symbol_slug, err);
-            std::process::exit(1);
-        });
-    let ticker_price = rt
-        .block_on(client.get_ticker_price(&symbol_slug))
-        .unwrap_or_else(|err| {
-            eprintln!("Error loading ticker price for {}: {}", symbol_slug, err);
-            std::process::exit(1);
-        });
 
-    let size_base_1 = symbol.tune_quantity(config.size_1.unwrap() / ticker_price, ticker_price);
-    let size_base_2 = symbol.tune_quantity(config.size_2.unwrap() / ticker_price, ticker_price);
-    let size_base_3 = symbol.tune_quantity(config.size_3.unwrap() / ticker_price, ticker_price);
+    let mut sizes = Sizes::new([
+        config.size_1.unwrap(),
+        config.size_2.unwrap(),
+        config.size_3.unwrap(),
+    ]);
 
     let mut window_width = 800;
     let mut window_height = 600;
@@ -110,32 +73,12 @@ fn main() {
     )
     .unwrap();
 
-    let (alert_sender, alert_receiver) = channel();
-    let mut alerts_manager = AlertManager::new(alert_receiver);
-
-    let mut interval = Interval::M5;
-    let candles_limit = 100;
-    let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(candles_limit)));
-    let shared_dom_state = Arc::new(RwLock::new(DomState::new(symbol.tick_size)));
-    let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
-    let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
-
     let mut size_range = Decimal::ZERO;
-    let mut size = config.size_1.unwrap();
-    let mut size_base = size_base_1;
-
-    let (mut handle, mut stop_tx) = listen_streams(
-        shared_candles_state.clone(),
-        shared_dom_state.clone(),
-        shared_order_flow_state.clone(),
-        symbol.slug.to_string(),
-        interval,
-        candles_limit,
-        500,
-    );
-
-    listen_open_interest(shared_open_interest_state.clone(), symbol.slug.to_string());
-    listen_orders(&config, symbol.slug.to_string(), alert_sender.clone());
+    let mut sizes = Sizes::new([
+        config.size_1.unwrap(),
+        config.size_2.unwrap(),
+        config.size_3.unwrap(),
+    ]);
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -145,9 +88,11 @@ fn main() {
             std::process::exit(1);
         });
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
-    let mut dom_renderer = DomRenderer::new(layout.dom_area);
+    let mut order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
+
+    let mut orders = Orders::new();
 
     window.set_target_fps(60);
 
@@ -155,14 +100,35 @@ fn main() {
     let mut px_per_tick = PxPerTick::default();
     let mut force_redraw = true;
     let mut left_was_pressed = false;
+    let mut bid: Option<Decimal> = None;
+    let mut ask: Option<Decimal> = None;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        alerts_manager.update();
+        match orders_receiver.try_recv() {
+            Ok(value) => {
+                orders.on_order(value);
+            }
+            Err(mpsc::TryRecvError::Empty) => {}
+            Err(mpsc::TryRecvError::Disconnected) => {}
+        };
+
+        {
+            let order_book = shared_state.order_book.read().unwrap();
+            bid = order_book.bid();
+            ask = order_book.ask();
+        }
+
+        logs_manager.update();
 
         // pause recenter if ctrl is pressed
         if !center.is_some()
             || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
         {
-            if let current_center = shared_dom_state.read().unwrap().center() {
+            if bid.is_some() && ask.is_some() {
+                let current_center = Some(
+                    ((bid.unwrap() + ask.unwrap()) / Decimal::from(2) / symbol.tick_size).floor()
+                        * symbol.tick_size,
+                );
+
                 if center.is_some() {
                     if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
                         * px_per_tick.get()
@@ -184,7 +150,7 @@ fn main() {
                 dt = DrawTarget::new(window_width as i32, window_height as i32);
                 layout = Layout::new(window_width as i32, window_height as i32);
                 candles_renderer = CandlesRenderer::new(layout.candles_area);
-                dom_renderer = DomRenderer::new(layout.dom_area);
+                order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
                 order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
                 status_renderer = StatusRenderer::new(layout.status_area);
 
@@ -193,30 +159,60 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
-            size = config.size_1.unwrap();
-            size_base = size_base_1;
+            sizes.select_size(0);
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
-            size = config.size_2.unwrap();
-            size_base = size_base_2;
+            sizes.select_size(1);
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
-            size = config.size_3.unwrap();
-            size_base = size_base_3;
+            sizes.select_size(2);
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
-            rt.block_on(trader.buy(&client, &symbol, size_base))
+            if let Some(price) = bid {
+                let size_base = sizes.get_value(price, &symbol);
+                exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Buy,
+                    quantity: size_base,
+                    price: None,
+                });
+            }
         }
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
-            rt.block_on(trader.sell(&client, &symbol, size_base))
+            if let Some(price) = bid {
+                let size_base = sizes.get_value(price, &symbol);
+                exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Sell,
+                    quantity: size_base,
+                    price: None,
+                });
+            }
         }
 
         if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
-            rt.block_on(trader.flat(&client, &symbol))
+            let balance = orders.base_balance();
+            if balance != Decimal::ZERO {
+                if balance > Decimal::ZERO {
+                    exchange.place_order(NewOrder {
+                        order_type: OrderType::Market,
+                        order_side: OrderSide::Sell,
+                        quantity: balance,
+                        price: None,
+                    });
+                } else {
+                    exchange.place_order(NewOrder {
+                        order_type: OrderType::Market,
+                        order_side: OrderSide::Buy,
+                        quantity: -balance,
+                        price: None,
+                    });
+                }
+            }
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -241,19 +237,7 @@ fn main() {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
-                // Restart streams with new interval: stop previous, join, then start new
-                let (new_handle, new_stop) = restart_streams(
-                    handle,
-                    stop_tx,
-                    shared_candles_state.clone(),
-                    shared_dom_state.clone(),
-                    shared_order_flow_state.clone(),
-                    symbol.slug.to_string(),
-                    interval,
-                    candles_limit,
-                );
-                handle = new_handle;
-                stop_tx = new_stop;
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -265,19 +249,7 @@ fn main() {
             let new_interval = interval.down();
             if new_interval != interval {
                 interval = new_interval;
-                // Restart streams with new interval: stop previous, join, then start new
-                let (new_handle, new_stop) = restart_streams(
-                    handle,
-                    stop_tx,
-                    shared_candles_state.clone(),
-                    shared_dom_state.clone(),
-                    shared_order_flow_state.clone(),
-                    symbol.slug.to_string(),
-                    interval,
-                    candles_limit,
-                );
-                handle = new_handle;
-                stop_tx = new_stop;
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -297,19 +269,19 @@ fn main() {
 
         if let Some(center_price) = center {
             candles_renderer.render(
-                shared_candles_state.read().unwrap(),
-                shared_open_interest_state.read().unwrap(),
+                shared_state.candles.read().unwrap(),
+                shared_state.open_interest.read().unwrap(),
                 &mut dt,
                 &text_renderer,
                 &color_schema,
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
-                trader.orders(),
+                orders.all(),
                 force_redraw,
             );
-            dom_renderer.render(
-                shared_dom_state.read().unwrap(),
+            order_book_renderer.render(
+                shared_state.order_book.read().unwrap(),
                 &mut dt,
                 &color_schema,
                 symbol.tick_size,
@@ -319,7 +291,7 @@ fn main() {
                 force_redraw,
             );
             order_flow_renderer.render(
-                shared_order_flow_state.read().unwrap(),
+                shared_state.order_flow.read().unwrap(),
                 &mut dt,
                 &color_schema,
                 symbol.tick_size,
@@ -329,19 +301,16 @@ fn main() {
                 force_redraw,
             );
         }
-        {
-            let dom_state = shared_dom_state.read().unwrap();
-            status_renderer.render(
-                interval,
-                size,
-                &mut dt,
-                &text_renderer,
-                &color_schema,
-                trader.pnl(dom_state.bid(), dom_state.ask()),
-                trader.base_balance(),
-            );
-        }
-        let active_alerts = alerts_manager.get_active_alerts();
+        status_renderer.render(
+            interval,
+            sizes.get_quote(),
+            &mut dt,
+            &text_renderer,
+            &color_schema,
+            orders.pnl(bid, ask),
+            orders.base_balance(),
+        );
+        let active_alerts = logs_manager.get_active_alerts();
         if active_alerts.is_empty() {
             window.set_title(&format!("Scalper - {}", symbol.slug));
         } else {
@@ -356,6 +325,5 @@ fn main() {
         force_redraw = false;
     }
 
-    let _ = stop_tx.send(());
-    let _ = handle.join();
+    exchange.stop()
 }

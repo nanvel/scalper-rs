@@ -33,7 +33,7 @@ pub fn build_signed_query(params: &[(&str, &str)], secret: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{build_signed_query, get_timestamp, sign};
 
     #[test]
     fn test_sign() {

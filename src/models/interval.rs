@@ -16,6 +16,10 @@ impl Interval {
         }
     }
 
+    pub fn seconds(&self) -> u32 {
+        self.minutes() * 60
+    }
+
     pub fn slug(&self) -> &'static str {
         match self {
             Interval::M1 => "1m",
