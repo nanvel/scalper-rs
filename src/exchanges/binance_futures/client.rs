@@ -219,7 +219,7 @@ impl BinanceClient {
         let candles: Vec<Candle> = data
             .iter()
             .map(|k| Candle {
-                open_time: (k[0].as_u64().unwrap() / 1000).into(),
+                open_time: Timestamp::from_milliseconds(k[0].as_u64().unwrap()),
                 open: Decimal::from_str(k[1].as_str().unwrap()).unwrap(),
                 high: Decimal::from_str(k[2].as_str().unwrap()).unwrap(),
                 low: Decimal::from_str(k[3].as_str().unwrap()).unwrap(),
