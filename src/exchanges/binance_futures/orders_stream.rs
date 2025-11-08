@@ -127,7 +127,9 @@ pub async fn start_orders_stream(
                                                 er.price.unwrap(),
                                                 er.avg_price.unwrap(),
                                                 er.commission(),
-                                                Timestamp::from(er.trade_time.unwrap() / 1000),
+                                                Timestamp::from_milliseconds(
+                                                    er.trade_time.unwrap(),
+                                                ),
                                             ))
                                             .ok();
                                     }

@@ -43,8 +43,8 @@ mod tests {
     #[test]
     fn test_open_interest_push_and_get() {
         let mut oi_state = OpenInterestState::new();
-        let ts1 = Timestamp::from(1625079600); // 2021-06-30 15:00:00 UTC
-        let ts2 = Timestamp::from(1625083200); // 2021-06-30 16:00:00 UTC
+        let ts1 = Timestamp::from_milliseconds(1625079600000); // 2021-06-30 15:00:00 UTC
+        let ts2 = Timestamp::from_milliseconds(1625083200000); // 2021-06-30 16:00:00 UTC
 
         let oi1 = Decimal::from_str("12345.67").unwrap();
         let oi2 = Decimal::from_str("23456.78").unwrap();
@@ -54,6 +54,9 @@ mod tests {
 
         assert_eq!(oi_state.get(&ts1), Some(oi1));
         assert_eq!(oi_state.get(&ts2), Some(oi2));
-        assert_eq!(oi_state.get(&Timestamp::from(1625086800)), None); // 2021-06-30 17:00:00 UTC
+        assert_eq!(
+            oi_state.get(&Timestamp::from_milliseconds(1625086800000)),
+            None
+        ); // 2021-06-30 17:00:00 UTC
     }
 }

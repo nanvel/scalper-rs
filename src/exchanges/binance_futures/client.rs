@@ -278,7 +278,7 @@ impl BinanceClient {
             price: resp.price,
             average_price: resp.avg_price,
             commission: resp.commission(),
-            timestamp: Timestamp::from(resp.update_time / 1000),
+            timestamp: Timestamp::from_milliseconds(resp.update_time),
         })
     }
 
@@ -312,7 +312,7 @@ impl BinanceClient {
             price: resp.price,
             average_price: resp.avg_price,
             commission: resp.commission(),
-            timestamp: Timestamp::from(resp.update_time / 1000),
+            timestamp: Timestamp::from_milliseconds(resp.update_time),
         })
     }
 

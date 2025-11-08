@@ -42,7 +42,7 @@ pub async fn start_open_interest_stream(
                 let mut state = open_interest_state.write().unwrap();
                 for oi in entries.iter() {
                     state.push(
-                        &Timestamp::from(oi.timestamp / 1000),
+                        &Timestamp::from_milliseconds(oi.timestamp),
                         Decimal::from_str(oi.open_interest.as_str()).unwrap(),
                     );
                 }
@@ -63,7 +63,7 @@ pub async fn start_open_interest_stream(
                 Ok(json) => {
                     if let Ok(oi) = serde_json::from_value::<CurrentEntry>(json.clone()) {
                         let mut state = open_interest_state.write().unwrap();
-                        let ts = Timestamp::from(oi.timestamp / 1000);
+                        let ts = Timestamp::from_milliseconds(oi.timestamp);
                         state.push(&ts, Decimal::from_str(oi.open_interest.as_str()).unwrap());
                         state.online = true;
                         state.updated = ts;
