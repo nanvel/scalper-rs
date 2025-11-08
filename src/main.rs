@@ -3,12 +3,14 @@ mod graphics;
 mod models;
 
 use crate::exchanges::ExchangeFactory;
-use crate::models::Orders;
+use crate::models::{NewOrder, Orders};
 use graphics::{
     CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
 };
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{ColorSchema, Config, Interval, Layout, LogManager, PxPerTick};
+use models::{
+    ColorSchema, Config, Interval, Layout, LogManager, OrderSide, OrderType, PxPerTick, Sizes,
+};
 use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
@@ -51,9 +53,11 @@ fn main() {
 
     let symbol_slug = &args[1];
 
-    // let size_base_1 = symbol.tune_quantity(config.size_1.unwrap() / ticker_price, ticker_price);
-    // let size_base_2 = symbol.tune_quantity(config.size_2.unwrap() / ticker_price, ticker_price);
-    // let size_base_3 = symbol.tune_quantity(config.size_3.unwrap() / ticker_price, ticker_price);
+    let mut sizes = Sizes::new([
+        config.size_1.unwrap(),
+        config.size_2.unwrap(),
+        config.size_3.unwrap(),
+    ]);
 
     let mut window_width = 800;
     let mut window_height = 600;
@@ -70,8 +74,11 @@ fn main() {
     .unwrap();
 
     let mut size_range = Decimal::ZERO;
-    let mut size = config.size_1.unwrap();
-    // let mut size_base = size_base_1;
+    let mut sizes = Sizes::new([
+        config.size_1.unwrap(),
+        config.size_2.unwrap(),
+        config.size_3.unwrap(),
+    ]);
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -152,30 +159,60 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
-            size = config.size_1.unwrap();
-            // size_base = size_base_1;
+            sizes.select_size(0);
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
-            size = config.size_2.unwrap();
-            // size_base = size_base_2;
+            sizes.select_size(1);
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
-            size = config.size_3.unwrap();
-            // size_base = size_base_3;
+            sizes.select_size(2);
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
-            // rt.block_on(trader.buy(&client, &symbol, size_base))
+            if let Some(price) = bid {
+                let size_base = sizes.get_value(price, &symbol);
+                exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Buy,
+                    quantity: size_base,
+                    price: None,
+                });
+            }
         }
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
-            // rt.block_on(trader.sell(&client, &symbol, size_base))
+            if let Some(price) = bid {
+                let size_base = sizes.get_value(price, &symbol);
+                exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Sell,
+                    quantity: size_base,
+                    price: None,
+                });
+            }
         }
 
         if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
-            // rt.block_on(trader.flat(&client, &symbol))
+            let balance = orders.base_balance();
+            if balance != Decimal::ZERO {
+                if balance > Decimal::ZERO {
+                    exchange.place_order(NewOrder {
+                        order_type: OrderType::Market,
+                        order_side: OrderSide::Sell,
+                        quantity: balance,
+                        price: None,
+                    });
+                } else {
+                    exchange.place_order(NewOrder {
+                        order_type: OrderType::Market,
+                        order_side: OrderSide::Buy,
+                        quantity: -balance,
+                        price: None,
+                    });
+                }
+            }
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -266,7 +303,7 @@ fn main() {
         }
         status_renderer.render(
             interval,
-            size,
+            sizes.get_quote(),
             &mut dt,
             &text_renderer,
             &color_schema,

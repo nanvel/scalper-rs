@@ -11,6 +11,7 @@ mod order_flow;
 mod orders;
 mod px_per_tick;
 mod shared_state;
+mod sizes;
 mod symbol;
 mod timestamp;
 
@@ -27,5 +28,6 @@ pub use order_flow::{OrderFlowState, SharedOrderFlowState};
 pub use orders::{NewOrder, Order, OrderSide, OrderStatus, OrderType, Orders};
 pub use px_per_tick::PxPerTick;
 pub use shared_state::SharedState;
+pub use sizes::Sizes;
 pub use symbol::Symbol;
 pub use timestamp::Timestamp;

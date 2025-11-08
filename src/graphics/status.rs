@@ -44,7 +44,7 @@ impl StatusRenderer {
 
         text_renderer.draw(
             dt,
-            &(size.to_string() + "$"),
+            &(size.to_string()),
             self.area.left + self.padding * 2 + 25,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
