@@ -1,5 +1,7 @@
+use super::interval::Interval;
 use super::timestamp::Timestamp;
 use rust_decimal::Decimal;
+use rust_decimal::prelude::Zero;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
@@ -24,18 +26,20 @@ pub struct CandlesState {
     head: usize,
     size: usize,
     capacity: usize,
+    pub interval: Interval,
     pub online: bool,
     pub updated: Timestamp,
 }
 
 /// Circular buffer for candles
 impl CandlesState {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(capacity: usize, interval: Interval) -> Self {
         Self {
             data: vec![None; capacity].into_boxed_slice(),
             head: 0,
             size: 0,
             capacity,
+            interval,
             online: false,
             updated: Timestamp::now(),
         }
@@ -54,6 +58,7 @@ impl CandlesState {
                 return;
             }
         }
+
         // Add new candle
         self.data[self.head] = Some(candle);
         self.head = (self.head + 1) % self.capacity;
@@ -81,12 +86,51 @@ impl CandlesState {
         self.data[index]
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self, interval: Interval) {
         self.data = vec![None; self.capacity].into_boxed_slice();
         self.head = 0;
         self.size = 0;
+        self.interval = interval;
         self.online = false;
         self.updated = Timestamp::now();
+    }
+
+    pub fn to_candle(&self, interval: &Interval) -> Option<Candle> {
+        if let Some(last_candle) = self.last() {
+            let mut open = last_candle.open;
+            let mut high: Decimal = last_candle.high;
+            let mut low: Decimal = last_candle.low;
+            let mut volume: Decimal = Decimal::zero();
+            let open_time = Timestamp::from_seconds(
+                last_candle.open_time.seconds() / interval.seconds() as u64
+                    * interval.seconds() as u64,
+            );
+
+            for c in self.to_vec().iter().rev() {
+                if c.open_time < open_time {
+                    break;
+                }
+                if c.high > high {
+                    high = c.high;
+                }
+                if c.low < low {
+                    low = c.low;
+                }
+                volume += c.volume;
+                open = c.open;
+            }
+
+            Some(Candle {
+                open_time,
+                open,
+                high,
+                low,
+                close: last_candle.close,
+                volume,
+            })
+        } else {
+            None
+        }
     }
 }
 

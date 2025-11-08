@@ -1,6 +1,7 @@
 use crate::exchanges::base::USER_AGENT;
 use crate::models::{
-    Candle, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState, Timestamp,
+    Candle, CandlesState, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState,
+    Timestamp,
 };
 use futures_util::stream::StreamExt;
 use reqwest::Client;
@@ -93,6 +94,12 @@ pub async fn start_market_stream(
     let response = http_client.get(&dom_url).send().await?;
     let snapshot: DepthSnapshot = response.json().await?;
 
+    let mut candles_state_1m = CandlesState::new(60, Interval::M1);
+
+    for c in load_1m_candles(&http_client, symbol, candles_state_1m.capacity()).await? {
+        candles_state_1m.push(c);
+    }
+
     let bids: Vec<(Decimal, Decimal)> = snapshot
         .bids
         .iter()
@@ -167,11 +174,14 @@ pub async fn start_market_stream(
                             close: Decimal::from_str(&event.kline.close).unwrap(),
                             volume: Decimal::from_str(&event.kline.volume).unwrap(),
                         };
+                        candles_state_1m.push(candle);
 
                         let mut buffer = shared_candles_state.write().unwrap();
-                        buffer.push(candle);
-                        buffer.updated = Timestamp::from_milliseconds(event.event_time);
-                        buffer.online = true;
+                        if let Some(candle) = candles_state_1m.to_candle(&buffer.interval) {
+                            buffer.push(candle);
+                            buffer.updated = Timestamp::from_milliseconds(event.event_time);
+                            buffer.online = true;
+                        };
                     }
                 }
             }
@@ -205,4 +215,32 @@ fn extract_inner(text: &str) -> Option<serde_json::Value> {
         }
         Err(_) => None,
     }
+}
+
+async fn load_1m_candles(
+    client: &Client,
+    symbol: &String,
+    limit: usize,
+) -> Result<Vec<Candle>, Box<dyn std::error::Error>> {
+    let url = format!(
+        "https://fapi.binance.com/fapi/v1/klines?symbol={}&interval=1m&limit={}",
+        symbol, limit
+    );
+    let response = client.get(&url).send().await?;
+    let data: Vec<Vec<serde_json::Value>> = response.json().await?;
+
+    let mut candles = Vec::new();
+    for item in data {
+        let candle = Candle {
+            open_time: Timestamp::from_milliseconds(item[0].as_u64().unwrap()),
+            open: Decimal::from_str(item[1].as_str().unwrap()).unwrap(),
+            high: Decimal::from_str(item[2].as_str().unwrap()).unwrap(),
+            low: Decimal::from_str(item[3].as_str().unwrap()).unwrap(),
+            close: Decimal::from_str(item[4].as_str().unwrap()).unwrap(),
+            volume: Decimal::from_str(item[5].as_str().unwrap()).unwrap(),
+        };
+        candles.push(candle);
+    }
+
+    Ok(candles)
 }

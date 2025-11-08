@@ -51,14 +51,6 @@ fn main() {
 
     let mut logs_manager = LogManager::new(messages_receiver);
 
-    let symbol_slug = &args[1];
-
-    let mut sizes = Sizes::new([
-        config.size_1.unwrap(),
-        config.size_2.unwrap(),
-        config.size_3.unwrap(),
-    ]);
-
     let mut window_width = 800;
     let mut window_height = 600;
 
