@@ -1,6 +1,6 @@
 use crate::exchanges::base::USER_AGENT;
 use crate::models::{
-    Candle, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState,
+    Candle, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState, Timestamp,
 };
 use futures_util::stream::StreamExt;
 use reqwest::Client;
@@ -10,6 +10,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use tokio_tungstenite::tungstenite::http;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+use toml::value::Time;
 
 #[derive(Debug, Deserialize)]
 struct KlineEvent {
@@ -139,7 +140,7 @@ pub async fn start_market_stream(
                                 buffer.update_ask(price, qty);
                             }
                         }
-                        buffer.updated = event.event_time.into();
+                        buffer.updated = Timestamp::from_milliseconds(event.event_time);
                         buffer.online = true;
                     } else if let Ok(event) = serde_json::from_value::<AggTradeEvent>(data.clone())
                     {
@@ -154,12 +155,12 @@ pub async fn start_market_stream(
                             } else {
                                 buffer.buy(price, qty);
                             }
-                            buffer.updated = event.event_time.into();
+                            buffer.updated = Timestamp::from_milliseconds(event.event_time);
                             buffer.online = true;
                         }
                     } else if let Ok(event) = serde_json::from_value::<KlineEvent>(data.clone()) {
                         let candle = Candle {
-                            open_time: (event.kline.start_time / 1000).into(),
+                            open_time: Timestamp::from_milliseconds(event.kline.start_time),
                             open: Decimal::from_str(&event.kline.open).unwrap(),
                             high: Decimal::from_str(&event.kline.high).unwrap(),
                             low: Decimal::from_str(&event.kline.low).unwrap(),
@@ -169,7 +170,7 @@ pub async fn start_market_stream(
 
                         let mut buffer = shared_candles_state.write().unwrap();
                         buffer.push(candle);
-                        buffer.updated = event.event_time.into();
+                        buffer.updated = Timestamp::from_milliseconds(event.event_time);
                         buffer.online = true;
                     }
                 }

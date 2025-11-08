@@ -1,4 +1,4 @@
-use super::Timestamp;
+use super::timestamp::Timestamp;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
@@ -92,7 +92,7 @@ impl CandlesState {
 
 #[cfg(test)]
 mod tests {
-    use super::{Candle, CandlesState};
+    use super::{Candle, CandlesState, Timestamp};
     use rust_decimal::Decimal;
     use std::str::FromStr;
 
@@ -105,7 +105,7 @@ mod tests {
         volume: &str,
     ) -> Candle {
         Candle {
-            open_time: open_time.into(),
+            open_time: Timestamp::from_milliseconds(open_time),
             open: Decimal::from_str(open).unwrap(),
             high: Decimal::from_str(high).unwrap(),
             low: Decimal::from_str(low).unwrap(),

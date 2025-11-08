@@ -53,6 +53,11 @@ impl OrderBookRenderer {
         let max_width = Decimal::from((right - left) as u32);
         let central_point = self.area.height / 2;
 
+        // Guard: if tick_size is zero we cannot map prices to ticks/pixels — avoid division by zero
+        if tick_size.is_zero() {
+            return;
+        }
+
         let mut bid_buckets: Vec<Decimal> = vec![Decimal::ZERO; self.area.height as usize];
         let mut ask_buckets: Vec<Decimal> = vec![Decimal::ZERO; self.area.height as usize];
 

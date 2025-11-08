@@ -76,6 +76,11 @@ impl CandlesRenderer {
         let body_width = 11;
         let central_point = self.area.height / 2;
 
+        // Guard: tick_size must be non-zero to map prices to pixels
+        if tick_size.is_zero() {
+            return;
+        }
+
         let price_to_y = |price: Decimal| -> i32 {
             if price > center {
                 return central_point
@@ -192,7 +197,7 @@ impl CandlesRenderer {
                     .unwrap_or(0)
                     .max(1);
 
-                let oi_height = if max_oi > Decimal::ZERO {
+                let oi_height = if max_oi > Decimal::ZERO && !oi_diff.is_zero() {
                     (((open_interest_state
                         .get(&candle.open_time)
                         .unwrap_or(Decimal::ZERO)
@@ -232,23 +237,25 @@ impl CandlesRenderer {
         }
 
         if max_oi > Decimal::ZERO {
-            let oi_height = (max_oi / Decimal::from(100) / oi_diff * vh_dec)
-                .to_i32()
-                .unwrap_or(0);
-            let oi_top = (self.area.top + self.area.height) - oi_height;
-            let mut pb = PathBuilder::new();
-            pb.rect(
-                (self.area.width - 3) as f32,
-                oi_top as f32,
-                2.,
-                oi_height as f32,
-            );
-            let path = pb.finish();
-            dt.fill(
-                &path,
-                &Source::Solid(color_schema.scale_bar.into()),
-                &DrawOptions::new(),
-            );
+            if !oi_diff.is_zero() {
+                let oi_height = (max_oi / Decimal::from(100) / oi_diff * vh_dec)
+                    .to_i32()
+                    .unwrap_or(0);
+                let oi_top = (self.area.top + self.area.height) - oi_height;
+                let mut pb = PathBuilder::new();
+                pb.rect(
+                    (self.area.width - 3) as f32,
+                    oi_top as f32,
+                    2.,
+                    oi_height as f32,
+                );
+                let path = pb.finish();
+                dt.fill(
+                    &path,
+                    &Source::Solid(color_schema.scale_bar.into()),
+                    &DrawOptions::new(),
+                );
+            }
         }
 
         // scale
