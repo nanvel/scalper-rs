@@ -36,12 +36,12 @@ impl StatusRenderer {
 
         let now = Utc::now();
         let left_text = format!(
-            "{} <{}> {} {}L {}S",
+            "{} <{}> {}L {}S {}",
             interval.slug(),
             size.to_string(),
-            now.format("%H:%M:%S").to_string(),
             orders.open_limit().to_string(),
             orders.open_stop().to_string(),
+            now.format("%H:%M:%S").to_string(),
         );
         text_renderer.draw(
             dt,

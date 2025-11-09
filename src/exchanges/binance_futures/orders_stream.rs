@@ -82,15 +82,13 @@ pub async fn start_orders_stream(
         while let Some(msg) = read.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
-                    // Parse into generic JSON first to handle different Binance wrappers
                     if let Ok(value) = serde_json::from_str::<Value>(&text) {
-                        // Some user stream events carry the order under "o" (e.g. ORDER_TRADE_UPDATE),
-                        // others may be direct executionReport-like objects. Try both.
-                        let candidate = if value.get("o").is_some() {
-                            value.get("o").cloned().unwrap_or_else(|| value.clone())
-                        } else {
-                            value
-                        };
+                        let event = value.get("e").and_then(|v| v.as_str());
+                        if event != Some("ORDER_TRADE_UPDATE") {
+                            continue;
+                        }
+
+                        let candidate = value.get("o").cloned().unwrap_or_else(|| value.clone());
 
                         if let Ok(er) = serde_json::from_value::<ExecutionReport>(candidate) {
                             if let Some(sym) = &er.symbol {
