@@ -7,7 +7,7 @@ pub enum OrderSide {
     Sell,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum OrderType {
     Limit,
     Market,
@@ -148,5 +148,19 @@ impl Orders {
                 o.order_status == OrderStatus::Pending || o.executed_quantity > Decimal::from(0)
             })
             .collect()
+    }
+
+    pub fn open_limit(&self) -> usize {
+        self.orders
+            .iter()
+            .filter(|o| o.order_type == OrderType::Limit && o.order_status == OrderStatus::Pending)
+            .count()
+    }
+
+    pub fn open_stop(&self) -> usize {
+        self.orders
+            .iter()
+            .filter(|o| o.order_type == OrderType::Stop && o.order_status == OrderStatus::Pending)
+            .count()
     }
 }

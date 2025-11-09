@@ -83,7 +83,7 @@ pub async fn start_orders_stream(
             match msg {
                 Ok(Message::Text(text)) => {
                     // Parse into generic JSON first to handle different Binance wrappers
-                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if let Ok(value) = serde_json::from_str::<Value>(&text) {
                         // Some user stream events carry the order under "o" (e.g. ORDER_TRADE_UPDATE),
                         // others may be direct executionReport-like objects. Try both.
                         let candidate = if value.get("o").is_some() {
@@ -95,12 +95,7 @@ pub async fn start_orders_stream(
                         if let Ok(er) = serde_json::from_value::<ExecutionReport>(candidate) {
                             if let Some(sym) = &er.symbol {
                                 if sym.eq_ignore_ascii_case(&symbol) {
-                                    match &er.current_order_status {
-                                        Some(s) if s.eq("FILLED") => {
-                                            process_filled_order(&er, &logs_sender, &orders_sender)
-                                        }
-                                        _ => {}
-                                    }
+                                    process_filled_order(&er, &logs_sender, &orders_sender)
                                 }
                             }
                         }
@@ -124,13 +119,13 @@ fn process_filled_order(
     logs_sender: &Sender<Log>,
     orders_sender: &Sender<Order>,
 ) {
-    logs_sender
-        .send(Log::new(
-            LogLevel::Info,
-            format!("Filled {:?}", er.order_id),
-            Some(10),
-        ))
-        .ok();
+    // logs_sender
+    //     .send(Log::new(
+    //         LogLevel::Info,
+    //         format!("Filled {:?}", er.order_id),
+    //         Some(10),
+    //     ))
+    //     .ok();
 
     let order_side = match &er.side {
         Some(s) if s.eq("BUY") => OrderSide::Buy,

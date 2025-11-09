@@ -11,7 +11,7 @@ use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
     ColorSchema, Config, Interval, Layout, LogManager, OrderSide, OrderType, PxPerTick, Sizes,
 };
-use raqote::DrawTarget;
+use raqote::{DrawTarget, LineCap};
 use rust_decimal::{Decimal, prelude::FromStr};
 use std::env;
 use std::sync::mpsc;
@@ -98,6 +98,7 @@ fn main() {
         match orders_receiver.try_recv() {
             Ok(value) => {
                 orders.on_order(value);
+                force_redraw = true;
             }
             Err(mpsc::TryRecvError::Empty) => {}
             Err(mpsc::TryRecvError::Disconnected) => {}
@@ -112,8 +113,8 @@ fn main() {
         logs_manager.update();
 
         // pause recenter if ctrl is pressed
-        if !center.is_some()
-            || !(window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl))
+        if !(center.is_some()
+            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl)))
         {
             if bid.is_some() && ask.is_some() {
                 let current_center = Some(
@@ -251,7 +252,32 @@ fn main() {
         if left_pressed && !left_was_pressed {
             if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
                 if window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl) {
-                    dbg!(x, y);
+                    if let Some(center_price) = center {
+                        let price = (Decimal::from(layout.candles_area.height / 2 - y as i32)
+                            / px_per_tick.get())
+                        .floor()
+                            * symbol.tick_size
+                            + center_price;
+                        let size_base = sizes.get_value(price, &symbol);
+                        let order_type = if window.is_key_down(Key::LeftShift)
+                            || window.is_key_down(Key::RightShift)
+                        {
+                            OrderType::Stop
+                        } else {
+                            OrderType::Limit
+                        };
+                        let order_side = if price < bid.unwrap() {
+                            OrderSide::Buy
+                        } else {
+                            OrderSide::Sell
+                        };
+                        exchange.place_order(NewOrder {
+                            order_type,
+                            order_side,
+                            quantity: size_base,
+                            price: Some(price),
+                        });
+                    }
                 }
             }
         }
@@ -299,8 +325,9 @@ fn main() {
             &mut dt,
             &text_renderer,
             &color_schema,
-            orders.pnl(bid, ask),
-            orders.base_balance(),
+            &orders,
+            &bid,
+            &ask,
         );
         let active_alerts = logs_manager.get_active_alerts();
         if active_alerts.is_empty() {

@@ -1,3 +1,4 @@
+#[derive(Copy, Clone)]
 pub struct Area {
     pub left: i32,
     pub top: i32,

@@ -373,7 +373,7 @@ impl CandlesRenderer {
                 let path = pb.finish();
                 dt.fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
             } else {
-                let y = price_to_y(order.average_price);
+                let y = price_to_y(order.price);
                 let mut pb = PathBuilder::new();
                 pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
                 pb.line_to(
