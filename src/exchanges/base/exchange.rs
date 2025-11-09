@@ -12,5 +12,5 @@ pub trait Exchange: Send + Sync {
 
     fn place_order(&self, new_order: NewOrder) -> ();
 
-    fn cancel_order(&self, order: Order) -> ();
+    fn cancel_order(&self, order_id: String) -> ();
 }

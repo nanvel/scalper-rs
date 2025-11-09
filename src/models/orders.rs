@@ -150,6 +150,13 @@ impl Orders {
             .collect()
     }
 
+    pub fn open(&self) -> Vec<&Order> {
+        self.orders
+            .iter()
+            .filter(|o| o.order_status == OrderStatus::Pending)
+            .collect()
+    }
+
     pub fn open_limit(&self) -> usize {
         self.orders
             .iter()

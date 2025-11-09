@@ -267,9 +267,17 @@ fn main() {
                             OrderType::Limit
                         };
                         let order_side = if price < bid.unwrap() {
-                            OrderSide::Buy
+                            if order_type == OrderType::Limit {
+                                OrderSide::Buy
+                            } else {
+                                OrderSide::Sell
+                            }
                         } else {
-                            OrderSide::Sell
+                            if order_type == OrderType::Limit {
+                                OrderSide::Sell
+                            } else {
+                                OrderSide::Buy
+                            }
                         };
                         exchange.place_order(NewOrder {
                             order_type,
@@ -282,6 +290,12 @@ fn main() {
             }
         }
         left_was_pressed = left_pressed;
+
+        if window.is_key_pressed(Key::C, minifb::KeyRepeat::No) {
+            for o in orders.open() {
+                exchange.cancel_order(o.id.clone());
+            }
+        }
 
         let color_schema = ColorSchema::for_theme(config.theme);
 

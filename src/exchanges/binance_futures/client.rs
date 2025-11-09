@@ -252,9 +252,11 @@ impl BinanceClient {
             ("newOrderRespType", "RESULT".to_string()),
         ];
 
-        if let Some(price) = order.price {
-            params.push(("price", price.to_string()));
-        };
+        if order.order_type == OrderType::Limit {
+            params.push(("price", order.price.unwrap().to_string()));
+        } else if order.order_type == OrderType::Stop {
+            params.push(("stopPrice", order.price.unwrap().to_string()));
+        }
 
         if matches!(order.order_type, OrderType::Limit) {
             params.push(("timeInForce", "GTC".to_string()));
@@ -284,7 +286,7 @@ impl BinanceClient {
 
     pub fn cancel_order(&self, order_id: &str) -> Result<Order> {
         let params = vec![
-            ("symbol", order_id.to_string()),
+            ("symbol", self.symbol.clone()),
             ("orderId", order_id.to_string()),
         ];
         let resp: BinanceOrder = self.delete_signed("/fapi/v1/order", params)?;

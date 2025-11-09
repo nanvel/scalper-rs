@@ -180,10 +180,9 @@ impl Exchange for BinanceFuturesExchange {
         }
     }
 
-    fn cancel_order(&self, order: Order) -> () {
+    fn cancel_order(&self, order_id: String) -> () {
         if let Some(orders_sender) = &self.orders_sender {
             let client = self.client.clone();
-            let order_id = order.id.clone();
             let sender_clone = orders_sender.clone();
             thread::spawn(move || {
                 let order = client.cancel_order(&order_id).unwrap();
