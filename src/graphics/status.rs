@@ -34,14 +34,15 @@ impl StatusRenderer {
             &DrawOptions::new(),
         );
 
-        let now = Utc::now();
         let left_text = format!(
-            "{} <{}> {}L {}S {}",
+            "{} <{}> {}L {}S  {}  PNL: {} -{}",
             interval.slug(),
             size.to_string(),
             orders.open_limit().to_string(),
             orders.open_stop().to_string(),
-            now.format("%H:%M:%S").to_string(),
+            orders.base_balance(),
+            orders.pnl(*bid, *ask).to_string(),
+            orders.commission().to_string(),
         );
         text_renderer.draw(
             dt,
@@ -52,20 +53,11 @@ impl StatusRenderer {
             color_schema.text_light,
         );
 
-        let pnl = orders.pnl(*bid, *ask);
-        let balance = orders.base_balance();
+        let now = Utc::now();
         text_renderer.draw(
             dt,
-            &pnl.to_string(),
-            self.area.left + self.area.width - 100,
-            self.area.top + self.area.height / 2 + self.padding * 2,
-            self.area.height - self.padding * 2,
-            color_schema.text_light,
-        );
-        text_renderer.draw(
-            dt,
-            &balance.to_string(),
-            self.area.left + self.area.width - 200,
+            &now.format("%H:%M:%S").to_string(),
+            self.area.left + self.area.width - 60,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,

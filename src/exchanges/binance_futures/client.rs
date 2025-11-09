@@ -387,6 +387,6 @@ impl BinanceOrder {
             "LIMIT" => Decimal::from_str("0.0002").unwrap(),
             _ => Decimal::from_str("0.0005").unwrap(),
         };
-        self.executed_qty * self.price * rate
+        self.executed_qty * self.avg_price * rate
     }
 }
