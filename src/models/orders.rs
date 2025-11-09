@@ -40,6 +40,7 @@ pub struct Order {
     pub average_price: Decimal,
     pub commission: Decimal,
     pub timestamp: Timestamp,
+    pub is_update: bool,
 }
 
 impl Order {
@@ -54,6 +55,7 @@ impl Order {
         average_price: Decimal,
         commission: Decimal,
         timestamp: Timestamp,
+        is_update: bool,
     ) -> Self {
         Self {
             id,
@@ -66,6 +68,7 @@ impl Order {
             average_price,
             commission,
             timestamp,
+            is_update,
         }
     }
 
@@ -89,7 +92,10 @@ impl Orders {
                 self.orders[pos] = order;
             }
         } else {
-            self.orders.push(order);
+            if !order.is_update {
+                // do not insert updates and the order could be created outside the app
+                self.orders.push(order);
+            }
         }
     }
 

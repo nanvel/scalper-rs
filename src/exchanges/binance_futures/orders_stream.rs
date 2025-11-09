@@ -156,6 +156,7 @@ fn process_filled_order(
             er.avg_price.unwrap(),
             er.commission(),
             Timestamp::from_milliseconds(er.trade_time.unwrap()),
+            true,
         ))
         .ok();
 }

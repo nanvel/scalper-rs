@@ -51,8 +51,8 @@ fn main() {
 
     let mut logs_manager = LogManager::new(messages_receiver);
 
-    let mut window_width = 800;
-    let mut window_height = 600;
+    let mut window_width = config.window_width;
+    let mut window_height = config.window_height;
 
     let mut window = Window::new(
         &format!("Scalper - {}", symbol.slug),

@@ -281,6 +281,7 @@ impl BinanceClient {
             average_price: resp.avg_price,
             commission: resp.commission(),
             timestamp: Timestamp::from_milliseconds(resp.update_time),
+            is_update: false,
         })
     }
 
@@ -315,6 +316,7 @@ impl BinanceClient {
             average_price: resp.avg_price,
             commission: resp.commission(),
             timestamp: Timestamp::from_milliseconds(resp.update_time),
+            is_update: false,
         })
     }
 }
