@@ -35,7 +35,10 @@ impl Exchange for BinanceFuturesExchange {
         &mut self,
     ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>
     {
-        let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(self.candles_limit)));
+        let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(
+            self.candles_limit,
+            self.interval.clone(),
+        )));
         let shared_order_book_state = Arc::new(RwLock::new(OrderBookState::new()));
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
         let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
@@ -47,25 +50,6 @@ impl Exchange for BinanceFuturesExchange {
         self.shared_candles_state = Some(shared_candles_state.clone());
 
         let symbol = self.client.get_symbol()?;
-        let listen_key: Option<String> = if let Some(key) = &self.access_key {
-            let listen_key = self.client.get_listen_key();
-            if listen_key.is_err() {
-                if let Some(sender) = &self.logs_sender {
-                    sender
-                        .send(Log::new(
-                            LogLevel::Error,
-                            listen_key.err().unwrap().to_string(),
-                            Some(30),
-                        ))
-                        .unwrap();
-                }
-                None
-            } else {
-                Some(listen_key.unwrap())
-            }
-        } else {
-            None
-        };
 
         self.set_interval(self.interval.clone());
 
@@ -79,6 +63,10 @@ impl Exchange for BinanceFuturesExchange {
 
         let logs_sender_clone = self.logs_sender.clone().unwrap();
         let orders_sender_clone = self.orders_sender.clone().unwrap();
+
+        let access_key_clone = self.access_key.clone();
+        let secret_key_clone = self.secret_key.clone();
+
         let handle = thread::spawn(move || {
             let rt = runtime::Builder::new_multi_thread()
                 .worker_threads(1)
@@ -110,7 +98,8 @@ impl Exchange for BinanceFuturesExchange {
                     }
 
                     res = start_orders_stream(
-                        listen_key,
+                        access_key_clone,
+                        secret_key_clone,
                         &symbol_clone,
                         logs_sender_clone,
                         orders_sender_clone,
@@ -171,7 +160,7 @@ impl Exchange for BinanceFuturesExchange {
 
         if let Some(shared_candles_state) = self.shared_candles_state.as_ref() {
             let mut buffer = shared_candles_state.write().unwrap();
-            buffer.clear();
+            buffer.clear(interval.clone());
             for candle in candles {
                 buffer.push(candle);
             }
@@ -191,10 +180,9 @@ impl Exchange for BinanceFuturesExchange {
         }
     }
 
-    fn cancel_order(&self, order: Order) -> () {
+    fn cancel_order(&self, order_id: String) -> () {
         if let Some(orders_sender) = &self.orders_sender {
             let client = self.client.clone();
-            let order_id = order.id.clone();
             let sender_clone = orders_sender.clone();
             thread::spawn(move || {
                 let order = client.cancel_order(&order_id).unwrap();

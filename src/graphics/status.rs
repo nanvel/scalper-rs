@@ -1,5 +1,5 @@
 use super::text::TextRenderer;
-use crate::models::{Area, ColorSchema, Interval};
+use crate::models::{Area, ColorSchema, Interval, Orders};
 use chrono::Utc;
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
@@ -21,8 +21,9 @@ impl StatusRenderer {
         dt: &mut DrawTarget,
         text_renderer: &TextRenderer,
         color_schema: &ColorSchema,
-        pnl: Decimal,
-        balance: Decimal,
+        orders: &Orders,
+        bid: &Option<Decimal>,
+        ask: &Option<Decimal>,
     ) {
         dt.fill_rect(
             self.area.left as f32,
@@ -33,24 +34,26 @@ impl StatusRenderer {
             &DrawOptions::new(),
         );
 
+        let now = Utc::now();
+        let left_text = format!(
+            "{} <{}> {}L {}S {}",
+            interval.slug(),
+            size.to_string(),
+            orders.open_limit().to_string(),
+            orders.open_stop().to_string(),
+            now.format("%H:%M:%S").to_string(),
+        );
         text_renderer.draw(
             dt,
-            interval.slug(),
+            &left_text,
             self.area.left + self.padding * 2,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,
         );
 
-        text_renderer.draw(
-            dt,
-            &(size.to_string()),
-            self.area.left + self.padding * 2 + 25,
-            self.area.top + self.area.height / 2 + self.padding * 2,
-            self.area.height - self.padding * 2,
-            color_schema.text_light,
-        );
-
+        let pnl = orders.pnl(*bid, *ask);
+        let balance = orders.base_balance();
         text_renderer.draw(
             dt,
             &pnl.to_string(),
@@ -63,16 +66,6 @@ impl StatusRenderer {
             dt,
             &balance.to_string(),
             self.area.left + self.area.width - 200,
-            self.area.top + self.area.height / 2 + self.padding * 2,
-            self.area.height - self.padding * 2,
-            color_schema.text_light,
-        );
-
-        let now = Utc::now();
-        text_renderer.draw(
-            dt,
-            &now.format("%H:%M:%S").to_string(),
-            self.area.left + self.padding * 2 + 80,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,

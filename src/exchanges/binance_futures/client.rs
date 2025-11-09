@@ -219,7 +219,7 @@ impl BinanceClient {
         let candles: Vec<Candle> = data
             .iter()
             .map(|k| Candle {
-                open_time: (k[0].as_u64().unwrap() / 1000).into(),
+                open_time: Timestamp::from_milliseconds(k[0].as_u64().unwrap()),
                 open: Decimal::from_str(k[1].as_str().unwrap()).unwrap(),
                 high: Decimal::from_str(k[2].as_str().unwrap()).unwrap(),
                 low: Decimal::from_str(k[3].as_str().unwrap()).unwrap(),
@@ -252,9 +252,11 @@ impl BinanceClient {
             ("newOrderRespType", "RESULT".to_string()),
         ];
 
-        if let Some(price) = order.price {
-            params.push(("price", price.to_string()));
-        };
+        if order.order_type == OrderType::Limit {
+            params.push(("price", order.price.unwrap().to_string()));
+        } else if order.order_type == OrderType::Stop {
+            params.push(("stopPrice", order.price.unwrap().to_string()));
+        }
 
         if matches!(order.order_type, OrderType::Limit) {
             params.push(("timeInForce", "GTC".to_string()));
@@ -284,7 +286,7 @@ impl BinanceClient {
 
     pub fn cancel_order(&self, order_id: &str) -> Result<Order> {
         let params = vec![
-            ("symbol", order_id.to_string()),
+            ("symbol", self.symbol.clone()),
             ("orderId", order_id.to_string()),
         ];
         let resp: BinanceOrder = self.delete_signed("/fapi/v1/order", params)?;
@@ -314,11 +316,6 @@ impl BinanceClient {
             commission: resp.commission(),
             timestamp: Timestamp::from_milliseconds(resp.update_time),
         })
-    }
-
-    pub fn get_listen_key(&self) -> Result<String> {
-        let response: ListenKeyResponse = self.post_signed("/fapi/v1/listenKey", vec![])?;
-        Ok(response.listen_key)
     }
 }
 
@@ -390,10 +387,4 @@ impl BinanceOrder {
         };
         self.executed_qty * self.price * rate
     }
-}
-
-#[derive(serde::Deserialize)]
-pub struct ListenKeyResponse {
-    #[serde(rename = "listenKey")]
-    pub listen_key: String,
 }
