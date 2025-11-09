@@ -3,6 +3,7 @@ use crate::models::{Area, ColorSchema, Interval, Orders};
 use chrono::Utc;
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 pub struct StatusRenderer {
     area: Area,
@@ -40,9 +41,9 @@ impl StatusRenderer {
             size.to_string(),
             orders.open_limit().to_string(),
             orders.open_stop().to_string(),
-            orders.base_balance(),
-            orders.pnl(*bid, *ask).to_string(),
-            orders.commission().to_string(),
+            format_compact(orders.base_balance(), 4),
+            format_compact(orders.pnl(*bid, *ask), 4),
+            format_compact(orders.commission(), 4),
         );
         text_renderer.draw(
             dt,
@@ -63,4 +64,23 @@ impl StatusRenderer {
             color_schema.text_light,
         );
     }
+}
+
+fn format_compact(n: Decimal, max_decimals: usize) -> String {
+    let n = n.to_f64().unwrap();
+    let (value, suffix) = if n.abs() >= 1e9 {
+        (n / 1e9, "B")
+    } else if n.abs() >= 1e6 {
+        (n / 1e6, "M")
+    } else if n.abs() >= 1e3 {
+        (n / 1e3, "K")
+    } else {
+        (n, "")
+    };
+
+    // Remove trailing zeros
+    let formatted = format!("{:.prec$}", value, prec = max_decimals);
+    let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
+
+    format!("{}{}", trimmed, suffix)
 }
