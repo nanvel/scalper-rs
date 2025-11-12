@@ -2,6 +2,7 @@ use super::text::TextRenderer;
 use crate::models::{
     Area, CandlesState, ColorSchema, OpenInterestState, Order, OrderSide, Timestamp,
 };
+use f64_fixed::to_fixed_string;
 use raqote::{
     DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
 };
@@ -272,8 +273,8 @@ impl CandlesRenderer {
 
         text_renderer.draw(
             dt,
-            &tick_price.to_string(),
-            self.area.width - 60,
+            &to_fixed_string(tick_price.to_f64().unwrap(), 8),
+            self.area.width - 40,
             price_to_y(tick_price) + 4,
             14,
             color_schema.text_light,
@@ -299,8 +300,8 @@ impl CandlesRenderer {
             let tp = tick_price + m * Decimal::from(i);
             text_renderer.draw(
                 dt,
-                &tp.to_string(),
-                self.area.width - 60,
+                &to_fixed_string(tp.to_f64().unwrap(), 8),
+                self.area.width - 40,
                 price_to_y(tp) + 4,
                 14,
                 color_schema.text_light,
@@ -311,8 +312,8 @@ impl CandlesRenderer {
             let tp = tick_price - m * Decimal::from(i);
             text_renderer.draw(
                 dt,
-                &tp.to_string(),
-                self.area.width - 60,
+                &to_fixed_string(tp.to_f64().unwrap(), 8),
+                self.area.width - 40,
                 price_to_y(tp) + 4,
                 14,
                 color_schema.text_light,
@@ -342,8 +343,8 @@ impl CandlesRenderer {
 
         text_renderer.draw(
             dt,
-            &current_price.to_string(),
-            self.area.width - 120,
+            &to_fixed_string(current_price.to_f64().unwrap(), 8),
+            self.area.width - 85,
             price_to_y(current_price) - 2,
             14,
             color_schema.text_light,

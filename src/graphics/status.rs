@@ -1,8 +1,10 @@
 use super::text::TextRenderer;
 use crate::models::{Area, ColorSchema, Interval, Orders};
 use chrono::Utc;
+use f64_fixed::to_fixed_string;
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 
 pub struct StatusRenderer {
     area: Area,
@@ -36,12 +38,13 @@ impl StatusRenderer {
 
         let now = Utc::now();
         let left_text = format!(
-            "{} <{}> {}L {}S {}",
+            "{} <{}> {}L {}S {} {}",
             interval.slug(),
             size.to_string(),
             orders.open_limit().to_string(),
             orders.open_stop().to_string(),
             now.format("%H:%M:%S").to_string(),
+            to_fixed_string(orders.base_balance().to_f64().unwrap(), 10),
         );
         text_renderer.draw(
             dt,
@@ -52,20 +55,18 @@ impl StatusRenderer {
             color_schema.text_light,
         );
 
-        let pnl = orders.pnl(*bid, *ask);
-        let balance = orders.base_balance();
         text_renderer.draw(
             dt,
-            &pnl.to_string(),
-            self.area.left + self.area.width - 100,
+            &to_fixed_string(orders.pnl(*bid, *ask).to_f64().unwrap(), 10),
+            self.area.left + self.area.width - 200,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,
         );
         text_renderer.draw(
             dt,
-            &balance.to_string(),
-            self.area.left + self.area.width - 200,
+            &to_fixed_string(orders.commission().to_f64().unwrap(), 10),
+            self.area.left + self.area.width - 100,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,

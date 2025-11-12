@@ -10,6 +10,7 @@ use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::Value;
 use std::io::repeat;
+use std::str::FromStr;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -48,14 +49,6 @@ pub struct ExecutionReport {
     pub trade_time: Option<u64>,
     #[serde(rename = "ap")]
     pub avg_price: Option<Decimal>,
-}
-
-impl ExecutionReport {
-    pub fn commission(&self) -> Decimal {
-        self.avg_price.unwrap()
-            * self.accumulated_executed_qty.as_ref().unwrap()
-            * Decimal::new(2, 3)
-    }
 }
 
 pub async fn start_orders_stream(
@@ -144,6 +137,12 @@ fn process_filled_order(
         _ => OrderStatus::Filled,
     };
 
+    let rate = match order_type {
+        OrderType::Limit => Decimal::from_str("0.0002").unwrap(),
+        _ => Decimal::from_str("0.0005").unwrap(),
+    };
+    let commission = er.accumulated_executed_qty.unwrap() * er.avg_price.unwrap() * rate;
+
     orders_sender
         .send(Order::new(
             er.order_id.unwrap_or_default().to_string(),
@@ -154,8 +153,9 @@ fn process_filled_order(
             er.accumulated_executed_qty.unwrap(),
             er.price.unwrap(),
             er.avg_price.unwrap(),
-            er.commission(),
+            commission,
             Timestamp::from_milliseconds(er.trade_time.unwrap()),
+            true,
         ))
         .ok();
 }

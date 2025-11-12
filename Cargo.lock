@@ -384,6 +384,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "f64-fixed"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe454b7ff305fcffb30ea9d9bbf8cbbfa1ac5290bcb69da55f27601c4a31f068"
+
+[[package]]
 name = "fastrand"
 version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1698,6 +1704,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dirs",
+ "f64-fixed",
  "font-kit",
  "futures-util",
  "hex",

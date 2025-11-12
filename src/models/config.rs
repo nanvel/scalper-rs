@@ -8,6 +8,10 @@ use std::path::PathBuf;
 pub struct Config {
     #[serde(default)]
     pub theme: Theme,
+    #[serde(default = "default_width")]
+    pub window_width: usize,
+    #[serde(default = "default_height")]
+    pub window_height: usize,
 
     pub binance_access_key: Option<String>,
     pub binance_secret_key: Option<String>,
@@ -22,6 +26,14 @@ pub struct Config {
 
 fn default_size() -> Option<Decimal> {
     Some(Decimal::from(100))
+}
+
+fn default_width() -> usize {
+    800
+}
+
+fn default_height() -> usize {
+    600
 }
 
 impl Config {
