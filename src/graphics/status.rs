@@ -1,6 +1,7 @@
 use super::text::TextRenderer;
 use crate::models::{Area, ColorSchema, Interval, Orders};
 use chrono::Utc;
+use f64_fixed::to_fixed_string;
 use raqote::{DrawOptions, DrawTarget, Source};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
@@ -35,15 +36,15 @@ impl StatusRenderer {
             &DrawOptions::new(),
         );
 
+        let now = Utc::now();
         let left_text = format!(
-            "{} <{}> {}L {}S  {}  PNL: {} -{}",
+            "{} <{}> {}L {}S {} {}",
             interval.slug(),
             size.to_string(),
             orders.open_limit().to_string(),
             orders.open_stop().to_string(),
-            format_compact(orders.base_balance(), 4),
-            format_compact(orders.pnl(*bid, *ask), 4),
-            format_compact(orders.commission(), 4),
+            now.format("%H:%M:%S").to_string(),
+            to_fixed_string(orders.base_balance().to_f64().unwrap(), 10),
         );
         text_renderer.draw(
             dt,
@@ -54,33 +55,21 @@ impl StatusRenderer {
             color_schema.text_light,
         );
 
-        let now = Utc::now();
         text_renderer.draw(
             dt,
-            &now.format("%H:%M:%S").to_string(),
-            self.area.left + self.area.width - 60,
+            &to_fixed_string(orders.pnl(*bid, *ask).to_f64().unwrap(), 10),
+            self.area.left + self.area.width - 200,
+            self.area.top + self.area.height / 2 + self.padding * 2,
+            self.area.height - self.padding * 2,
+            color_schema.text_light,
+        );
+        text_renderer.draw(
+            dt,
+            &to_fixed_string(orders.commission().to_f64().unwrap(), 10),
+            self.area.left + self.area.width - 100,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,
             color_schema.text_light,
         );
     }
-}
-
-fn format_compact(n: Decimal, max_decimals: usize) -> String {
-    let n = n.to_f64().unwrap();
-    let (value, suffix) = if n.abs() >= 1e9 {
-        (n / 1e9, "B")
-    } else if n.abs() >= 1e6 {
-        (n / 1e6, "M")
-    } else if n.abs() >= 1e3 {
-        (n / 1e3, "K")
-    } else {
-        (n, "")
-    };
-
-    // Remove trailing zeros
-    let formatted = format!("{:.prec$}", value, prec = max_decimals);
-    let trimmed = formatted.trim_end_matches('0').trim_end_matches('.');
-
-    format!("{}{}", trimmed, suffix)
 }
