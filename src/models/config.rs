@@ -32,7 +32,8 @@ pub struct Config {
 struct Cli {
     #[arg(index = 1)]
     symbol: String,
-
+    #[arg(long)]
+    theme: Option<String>,
     #[arg(long)]
     sl_pnl: Option<Decimal>,
 }
@@ -71,6 +72,13 @@ impl Config {
         let mut cli_overrides = Cli::parse();
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);
+        }
+        if let Some(theme) = cli_overrides.theme {
+            config.theme = match theme.to_lowercase().as_str() {
+                "light" => Theme::Light,
+                "auto" => Theme::Auto,
+                _ => Theme::Dark,
+            };
         }
 
         Ok(config)
