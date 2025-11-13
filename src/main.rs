@@ -94,6 +94,7 @@ fn main() {
     let mut left_was_pressed = false;
     let mut bid: Option<Decimal> = None;
     let mut ask: Option<Decimal> = None;
+    let mut sl_triggered = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
@@ -294,6 +295,32 @@ fn main() {
         if window.is_key_pressed(Key::C, minifb::KeyRepeat::No) {
             for o in orders.open() {
                 exchange.cancel_order(o.id.clone());
+            }
+        }
+
+        if bid.is_some() && !sl_triggered {
+            if let Some(sl_pnl) = config.sl_pnl {
+                if orders.pnl(bid, ask) < sl_pnl {
+                    sl_triggered = true;
+                    let balance = orders.base_balance();
+                    if balance != Decimal::ZERO {
+                        if balance > Decimal::ZERO {
+                            exchange.place_order(NewOrder {
+                                order_type: OrderType::Market,
+                                order_side: OrderSide::Sell,
+                                quantity: balance,
+                                price: None,
+                            });
+                        } else {
+                            exchange.place_order(NewOrder {
+                                order_type: OrderType::Market,
+                                order_side: OrderSide::Buy,
+                                quantity: -balance,
+                                price: None,
+                            });
+                        }
+                    }
+                }
             }
         }
 
