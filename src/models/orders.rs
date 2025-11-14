@@ -151,7 +151,7 @@ impl Orders {
         self.orders
             .iter()
             .filter(|o| {
-                o.order_status == OrderStatus::Pending || o.executed_quantity > Decimal::from(0)
+                o.order_status == OrderStatus::Pending || o.executed_quantity > Decimal::ZERO
             })
             .collect()
     }

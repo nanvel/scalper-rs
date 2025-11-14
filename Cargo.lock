@@ -481,9 +481,9 @@ dependencies = [
 
 [[package]]
 name = "f64-fixed"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6bd01f0ef6c83db17f16e4d6c7759d2d85753ecbc77561ea19c6e875e3174d1"
+checksum = "ddd31a8f568beed28a42362b4754bc098903a0cc374566f182a12a588755bcda"
 
 [[package]]
 name = "fastrand"

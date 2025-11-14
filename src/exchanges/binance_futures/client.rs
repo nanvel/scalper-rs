@@ -272,12 +272,15 @@ impl BinanceClient {
 
         Ok(Order {
             id: resp.order_id.to_string(),
-            order_type: order.order_type,
+            order_type: order.order_type.clone(),
             order_side: order.order_side,
             order_status,
             quantity: resp.orig_qty,
             executed_quantity: resp.executed_qty,
-            price: resp.price,
+            price: match &order.order_type {
+                OrderType::Stop => resp.stop_price,
+                _ => resp.price,
+            },
             average_price: resp.avg_price,
             commission: resp.commission(),
             timestamp: Timestamp::from_milliseconds(resp.update_time),
@@ -366,6 +369,8 @@ pub struct BinanceOrder {
     #[serde(rename = "orderId")]
     pub order_id: u64,
     pub price: Decimal,
+    #[serde(rename = "stopPrice")]
+    pub stop_price: Decimal,
     #[serde(rename = "origQty")]
     pub orig_qty: Decimal,
     #[serde(rename = "executedQty")]
