@@ -4,9 +4,8 @@ use super::open_interest_stream::start_open_interest_stream;
 use super::orders_stream::start_orders_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
-    CandlesState, Interval, Log, LogLevel, NewOrder, OpenInterestState, Order, OrderBookState,
-    OrderFlowState, SharedCandlesState, SharedOpenInterestState, SharedOrderBookState,
-    SharedOrderFlowState, SharedState, Symbol,
+    CandlesState, Interval, Log, NewOrder, OpenInterestState, Order, OrderBookState,
+    OrderFlowState, SharedCandlesState, SharedState, Symbol,
 };
 use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
 use std::thread;
@@ -49,7 +48,7 @@ impl Exchange for BinanceFuturesExchange {
         self.orders_sender = Some(orders_sender);
         self.shared_candles_state = Some(shared_candles_state.clone());
 
-        let symbol = self.client.get_symbol()?;
+        let symbol = self.client.get_symbol_sync()?;
 
         self.set_interval(self.interval.clone());
 
@@ -155,7 +154,7 @@ impl Exchange for BinanceFuturesExchange {
 
         let candles = self
             .client
-            .get_candles(&interval_str, self.candles_limit)
+            .get_candles_sync(&interval_str, self.candles_limit)
             .unwrap();
 
         if let Some(shared_candles_state) = self.shared_candles_state.as_ref() {
@@ -174,7 +173,7 @@ impl Exchange for BinanceFuturesExchange {
             let client = self.client.clone();
             let sender_clone = orders_sender.clone();
             thread::spawn(move || {
-                let order = client.place_order(new_order).unwrap();
+                let order = client.place_order_sync(new_order).unwrap();
                 sender_clone.send(order).unwrap();
             });
         }
@@ -185,7 +184,7 @@ impl Exchange for BinanceFuturesExchange {
             let client = self.client.clone();
             let sender_clone = orders_sender.clone();
             thread::spawn(move || {
-                let order = client.cancel_order(&order_id).unwrap();
+                let order = client.cancel_order_sync(&order_id).unwrap();
                 sender_clone.send(order).unwrap();
             });
         }

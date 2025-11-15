@@ -9,12 +9,10 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::Value;
-use std::io::repeat;
 use std::str::FromStr;
 use std::sync::mpsc::Sender;
 use std::time::Duration;
 use tokio::time::sleep;
-use tokio_tungstenite::tungstenite::client;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
 #[derive(Debug, Deserialize, Clone)]
@@ -93,10 +91,12 @@ pub async fn start_orders_stream(
                     }
                 }
                 Ok(Message::Close(_frame)) => {
+                    sleep(Duration::from_secs(1)).await;
                     break;
                 }
                 Err(e) => {
                     eprintln!("account stream error: {}", e);
+                    sleep(Duration::from_secs(5)).await;
                     break;
                 }
                 _ => {}
