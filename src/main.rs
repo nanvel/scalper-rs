@@ -11,20 +11,11 @@ use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
     ColorSchema, Config, Interval, Layout, LogManager, OrderSide, OrderType, PxPerTick, Sizes,
 };
-use raqote::{DrawTarget, LineCap};
+use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
-use std::env;
 use std::sync::mpsc;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Error: Symbol argument is required");
-        eprintln!("Usage: {} <SYMBOL>", args[0]);
-        std::process::exit(1);
-    }
-
     let config = Config::load().unwrap_or_else(|err| {
         eprintln!("Error loading config: {}", err);
         std::process::exit(1);
@@ -33,7 +24,7 @@ fn main() {
     let mut interval = Interval::M1;
     let mut exchange = ExchangeFactory::create(
         "binance_usd_futures",
-        args[1].clone(),
+        config.symbol.clone(),
         interval,
         200,
         &config,

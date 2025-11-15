@@ -8,6 +8,8 @@ use std::path::PathBuf;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
+    pub symbol: String,
+    #[serde(default)]
     pub theme: Theme,
     #[serde(default = "default_width")]
     pub window_width: usize,
@@ -70,6 +72,7 @@ impl Config {
         let mut config: Config = toml::from_str(&contents)?;
 
         let mut cli_overrides = Cli::parse();
+        config.symbol = cli_overrides.symbol.clone();
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);
         }
