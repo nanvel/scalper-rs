@@ -66,6 +66,8 @@ impl Exchange for BinanceFuturesExchange {
         let access_key_clone = self.access_key.clone();
         let secret_key_clone = self.secret_key.clone();
 
+        let client_clone = self.client.clone();
+
         let handle = thread::spawn(move || {
             let rt = runtime::Builder::new_multi_thread()
                 .worker_threads(1)
@@ -97,8 +99,7 @@ impl Exchange for BinanceFuturesExchange {
                     }
 
                     res = start_orders_stream(
-                        access_key_clone,
-                        secret_key_clone,
+                        &client_clone,
                         &symbol_clone,
                         logs_sender_clone,
                         orders_sender_clone,

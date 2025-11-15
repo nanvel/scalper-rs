@@ -32,6 +32,10 @@ impl BinanceClient {
         }
     }
 
+    pub fn has_auth(&self) -> bool {
+        self.access_key.is_some() && self.secret_key.is_some()
+    }
+
     async fn handle_response<T: DeserializeOwned>(&self, response: Response) -> Result<T> {
         let status = response.status();
         let text = response.text().await?;
@@ -136,6 +140,40 @@ impl BinanceClient {
         let response = self
             .client
             .post(&url)
+            .header("X-MBX-APIKEY", access_key)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    async fn put_signed<T: DeserializeOwned>(
+        &self,
+        endpoint: &str,
+        params: Vec<(&str, String)>,
+    ) -> Result<T> {
+        let access_key = self
+            .access_key
+            .as_ref()
+            .ok_or_else(|| BinanceError::AuthError("API key not set".to_string()))?;
+        let secret_key = self
+            .secret_key
+            .as_ref()
+            .ok_or_else(|| BinanceError::AuthError("Secret key not set".to_string()))?;
+
+        let timestamp = get_timestamp().to_string();
+        let mut all_params = params;
+        all_params.push(("timestamp", timestamp));
+
+        let params_ref: Vec<(&str, &str)> =
+            all_params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+
+        let query = build_signed_query(&params_ref, secret_key);
+        let url = format!("{}{}?{}", BASE_URL, endpoint, query);
+
+        let response = self
+            .client
+            .put(&url)
             .header("X-MBX-APIKEY", access_key)
             .send()
             .await?;
@@ -343,6 +381,17 @@ impl BinanceClient {
     pub fn cancel_order_sync(&self, order_id: &str) -> Result<Order> {
         self.runtime.block_on(self.cancel_order(order_id))
     }
+
+    pub async fn create_listen_key(&self) -> Result<String> {
+        let listen_key_resp: ListenKey = self.post_signed("/fapi/v1/listenKey", vec![]).await?;
+        Ok(listen_key_resp.listen_key)
+    }
+
+    pub async fn refresh_listen_key(&self) -> Result<()> {
+        self.put_signed::<ListenKey>("/fapi/v1/listenKey", vec![])
+            .await?;
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -415,4 +464,10 @@ impl BinanceOrder {
         };
         self.executed_qty * self.avg_price * rate
     }
+}
+
+#[derive(Deserialize)]
+struct ListenKey {
+    #[serde(rename = "listenKey")]
+    listen_key: String,
 }

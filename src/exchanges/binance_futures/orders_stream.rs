@@ -1,11 +1,6 @@
-use super::auth::{build_signed_query, get_timestamp};
-use crate::exchanges::base::USER_AGENT;
-use crate::exchanges::binance_futures::client::ApiError;
-use crate::exchanges::binance_futures::errors::BinanceError;
+use super::client::BinanceClient;
 use crate::models::{Log, LogLevel, Order, OrderSide, OrderStatus, OrderType, Timestamp};
-use futures_util::SinkExt;
 use futures_util::stream::StreamExt;
-use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use serde_json::Value;
@@ -50,56 +45,67 @@ pub struct ExecutionReport {
 }
 
 pub async fn start_orders_stream(
-    access_key: Option<String>,
-    secret_key: Option<String>,
+    client: &BinanceClient,
     symbol: &String,
     logs_sender: Sender<Log>,
     orders_sender: Sender<Order>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if access_key.is_none() || secret_key.is_none() {
+    if !client.has_auth() {
         loop {
             sleep(Duration::from_secs(5)).await;
         }
     }
 
     loop {
-        let listen_key =
-            get_listen_key(&access_key.as_ref().unwrap(), &secret_key.as_ref().unwrap()).await?;
+        match client.create_listen_key().await {
+            Ok(listen_key) => {
+                let ws_url = format!("wss://fstream.binance.com/ws/{}", listen_key);
+                let (ws_stream, _) = connect_async(ws_url).await?;
+                let (_write, mut read) = ws_stream.split();
 
-        let ws_url = format!("wss://fstream.binance.com/ws/{}", listen_key);
-        let (ws_stream, _) = connect_async(ws_url).await?;
-        let (_write, mut read) = ws_stream.split();
+                while let Some(msg) = read.next().await {
+                    match msg {
+                        Ok(Message::Text(text)) => {
+                            if let Ok(value) = serde_json::from_str::<Value>(&text) {
+                                let event = value.get("e").and_then(|v| v.as_str());
+                                if event != Some("ORDER_TRADE_UPDATE") {
+                                    continue;
+                                }
 
-        while let Some(msg) = read.next().await {
-            match msg {
-                Ok(Message::Text(text)) => {
-                    if let Ok(value) = serde_json::from_str::<Value>(&text) {
-                        let event = value.get("e").and_then(|v| v.as_str());
-                        if event != Some("ORDER_TRADE_UPDATE") {
-                            continue;
-                        }
+                                let candidate =
+                                    value.get("o").cloned().unwrap_or_else(|| value.clone());
 
-                        let candidate = value.get("o").cloned().unwrap_or_else(|| value.clone());
-
-                        if let Ok(er) = serde_json::from_value::<ExecutionReport>(candidate) {
-                            if let Some(sym) = &er.symbol {
-                                if sym.eq_ignore_ascii_case(&symbol) {
-                                    process_filled_order(&er, &logs_sender, &orders_sender)
+                                if let Ok(er) = serde_json::from_value::<ExecutionReport>(candidate)
+                                {
+                                    if let Some(sym) = &er.symbol {
+                                        if sym.eq_ignore_ascii_case(&symbol) {
+                                            process_filled_order(&er, &logs_sender, &orders_sender)
+                                        }
+                                    }
                                 }
                             }
                         }
+                        Ok(Message::Close(_frame)) => {
+                            sleep(Duration::from_secs(1)).await;
+                            break;
+                        }
+                        Err(e) => {
+                            eprintln!("account stream error: {}", e);
+                            sleep(Duration::from_secs(5)).await;
+                            break;
+                        }
+                        _ => {}
                     }
                 }
-                Ok(Message::Close(_frame)) => {
-                    sleep(Duration::from_secs(1)).await;
-                    break;
-                }
-                Err(e) => {
-                    eprintln!("account stream error: {}", e);
+            }
+            Err(er) => {
+                logs_sender
+                    .send(Log::new(LogLevel::Info, format!("{:?}", er), Some(10)))
+                    .ok();
+
+                loop {
                     sleep(Duration::from_secs(5)).await;
-                    break;
                 }
-                _ => {}
             }
         }
     }
@@ -158,48 +164,4 @@ fn process_filled_order(
             true,
         ))
         .ok();
-}
-
-async fn get_listen_key(
-    access_key: &String,
-    secret_key: &String,
-) -> Result<String, Box<dyn std::error::Error>> {
-    let timestamp = get_timestamp().to_string();
-    let params = vec![("timestamp", timestamp)];
-    let params_ref: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-    let query = build_signed_query(&params_ref, secret_key);
-    let url = format!("https://fapi.binance.com/fapi/v1/listenKey?{}", query);
-
-    let http_client = Client::builder().user_agent(USER_AGENT).build()?;
-    let response = http_client
-        .post(&url)
-        .header("X-MBX-APIKEY", access_key)
-        .send()
-        .await?;
-
-    let status = response.status();
-    let text = response.text().await?;
-
-    if status.is_success() {
-        let data: Value = serde_json::from_str(&text)?;
-        if let Some(listen_key) = data["listenKey"].as_str() {
-            Ok(listen_key.to_string())
-        } else {
-            Err(Box::new(BinanceError::ParseError(
-                "Invalid listenKey".to_string(),
-            )))
-        }
-    } else {
-        if let Ok(api_error) = serde_json::from_str::<ApiError>(&text) {
-            Err(Box::new(BinanceError::ApiError {
-                code: api_error.code,
-                msg: api_error.msg,
-            }))
-        } else {
-            Err(Box::new(BinanceError::ApiError {
-                code: status.as_u16() as i32,
-                msg: text.to_string(),
-            }))
-        }
-    }
 }
