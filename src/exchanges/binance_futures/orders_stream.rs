@@ -104,7 +104,7 @@ pub async fn start_orders_stream(
                     .ok();
 
                 loop {
-                    sleep(Duration::from_secs(5)).await;
+                    sleep(Duration::from_mins(5)).await;
                 }
             }
         }

@@ -7,6 +7,7 @@ use crate::models::{
     CandlesState, Interval, Log, NewOrder, OpenInterestState, Order, OrderBookState,
     OrderFlowState, SharedCandlesState, SharedState, Symbol,
 };
+use std::io::repeat;
 use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
 use std::thread;
 use std::time::Duration;
@@ -68,6 +69,15 @@ impl Exchange for BinanceFuturesExchange {
 
         let client_clone = self.client.clone();
 
+        let keep_listen_key_alive = async |client: &BinanceClient| {
+            loop {
+                sleep(Duration::from_mins(30)).await;
+                if !client.has_auth() {
+                    let _ = client.refresh_listen_key().await;
+                }
+            }
+        };
+
         let handle = thread::spawn(move || {
             let rt = runtime::Builder::new_multi_thread()
                 .worker_threads(1)
@@ -108,6 +118,8 @@ impl Exchange for BinanceFuturesExchange {
                             eprintln!("Orders stream error: {:?}", e);
                         }
                     }
+
+                    _ = keep_listen_key_alive(&client_clone) => {}
 
                     _ = shutdown_rx => {
                         println!("Shutting down market stream listener");
