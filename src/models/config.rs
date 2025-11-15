@@ -1,4 +1,5 @@
 use super::color_schema::Theme;
+use clap::Parser;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -22,6 +23,19 @@ pub struct Config {
     pub size_2: Option<Decimal>,
     #[serde(default = "default_size")]
     pub size_3: Option<Decimal>,
+
+    pub sl_pnl: Option<Decimal>,
+}
+
+#[derive(Parser, Debug)]
+#[command(about = "Scalper")]
+struct Cli {
+    #[arg(index = 1)]
+    symbol: String,
+    #[arg(long)]
+    theme: Option<String>,
+    #[arg(long)]
+    sl_pnl: Option<Decimal>,
 }
 
 fn default_size() -> Option<Decimal> {
@@ -53,7 +67,19 @@ impl Config {
             }
         };
 
-        let config: Config = toml::from_str(&contents)?;
+        let mut config: Config = toml::from_str(&contents)?;
+
+        let mut cli_overrides = Cli::parse();
+        if let Some(sl_pnl) = cli_overrides.sl_pnl {
+            config.sl_pnl = Some(sl_pnl);
+        }
+        if let Some(theme) = cli_overrides.theme {
+            config.theme = match theme.to_lowercase().as_str() {
+                "light" => Theme::Light,
+                "auto" => Theme::Auto,
+                _ => Theme::Dark,
+            };
+        }
 
         Ok(config)
     }

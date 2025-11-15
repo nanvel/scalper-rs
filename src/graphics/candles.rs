@@ -273,8 +273,8 @@ impl CandlesRenderer {
 
         text_renderer.draw(
             dt,
-            &to_fixed_string(tick_price.to_f64().unwrap(), 8),
-            self.area.width - 40,
+            &to_fixed_string(tick_price.to_f64().unwrap(), -8),
+            self.area.width - 50,
             price_to_y(tick_price) + 4,
             14,
             color_schema.text_light,
@@ -300,8 +300,8 @@ impl CandlesRenderer {
             let tp = tick_price + m * Decimal::from(i);
             text_renderer.draw(
                 dt,
-                &to_fixed_string(tp.to_f64().unwrap(), 8),
-                self.area.width - 40,
+                &to_fixed_string(tp.to_f64().unwrap(), -8),
+                self.area.width - 50,
                 price_to_y(tp) + 4,
                 14,
                 color_schema.text_light,
@@ -312,8 +312,8 @@ impl CandlesRenderer {
             let tp = tick_price - m * Decimal::from(i);
             text_renderer.draw(
                 dt,
-                &to_fixed_string(tp.to_f64().unwrap(), 8),
-                self.area.width - 40,
+                &to_fixed_string(tp.to_f64().unwrap(), -8),
+                self.area.width - 50,
                 price_to_y(tp) + 4,
                 14,
                 color_schema.text_light,
@@ -343,8 +343,8 @@ impl CandlesRenderer {
 
         text_renderer.draw(
             dt,
-            &to_fixed_string(current_price.to_f64().unwrap(), 8),
-            self.area.width - 85,
+            &to_fixed_string(current_price.to_f64().unwrap(), -8),
+            self.area.width - 100,
             price_to_y(current_price) - 2,
             14,
             color_schema.text_light,

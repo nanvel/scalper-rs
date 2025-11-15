@@ -4,8 +4,6 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::str::FromStr;
-use std::thread;
-use tokio::runtime;
 use tokio::time::{Duration, sleep};
 
 #[derive(Debug, Deserialize)]

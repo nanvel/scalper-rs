@@ -4,20 +4,21 @@ use crate::exchanges::base::USER_AGENT;
 use crate::models::{
     Candle, NewOrder, Order, OrderSide, OrderStatus, OrderType, Symbol, Timestamp,
 };
-use reqwest::blocking::{Client, Response};
+use reqwest::{Client, Response};
 use rust_decimal::Decimal;
+use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::str::FromStr;
+use tokio::runtime::Runtime;
 
-#[derive(Debug, Clone)]
+const BASE_URL: &str = "https://fapi.binance.com";
+
 pub struct BinanceClient {
     client: Client,
     symbol: String,
     access_key: Option<String>,
     secret_key: Option<String>,
-    base_url: &'static str,
+    runtime: Runtime,
 }
 
 impl BinanceClient {
@@ -27,13 +28,17 @@ impl BinanceClient {
             symbol,
             access_key,
             secret_key,
-            base_url: "https://fapi.binance.com",
+            runtime: Runtime::new().expect("Failed to create BinanceClient Tokio runtime"),
         }
     }
 
-    fn handle_response<T: DeserializeOwned>(&self, response: Response) -> Result<T> {
+    pub fn has_auth(&self) -> bool {
+        self.access_key.is_some() && self.secret_key.is_some()
+    }
+
+    async fn handle_response<T: DeserializeOwned>(&self, response: Response) -> Result<T> {
         let status = response.status();
-        let text = response.text()?;
+        let text = response.text().await?;
 
         if status.is_success() {
             serde_json::from_str(&text).map_err(|e| {
@@ -54,12 +59,12 @@ impl BinanceClient {
         }
     }
 
-    fn get_public<T: DeserializeOwned>(
+    async fn get_public<T: DeserializeOwned>(
         &self,
         endpoint: &str,
         params: Option<&[(&str, &str)]>,
     ) -> Result<T> {
-        let mut url = format!("{}{}", self.base_url, endpoint);
+        let mut url = format!("{}{}", BASE_URL, endpoint);
 
         if let Some(params) = params {
             let query = params
@@ -70,11 +75,11 @@ impl BinanceClient {
             url.push_str(&format!("?{}", query));
         }
 
-        let response = self.client.get(&url).send()?;
-        self.handle_response(response)
+        let response = self.client.get(&url).send().await?;
+        self.handle_response(response).await
     }
 
-    fn get_signed<T: DeserializeOwned>(
+    async fn get_signed<T: DeserializeOwned>(
         &self,
         endpoint: &str,
         params: Option<Vec<(&str, String)>>,
@@ -96,18 +101,19 @@ impl BinanceClient {
             all_params.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
         let query = build_signed_query(&params_ref, secret_key);
-        let url = format!("{}{}?{}", self.base_url, endpoint, query);
+        let url = format!("{}{}?{}", BASE_URL, endpoint, query);
 
         let response = self
             .client
             .get(&url)
             .header("X-MBX-APIKEY", access_key)
-            .send()?;
+            .send()
+            .await?;
 
-        self.handle_response(response)?
+        self.handle_response(response).await
     }
 
-    fn post_signed<T: DeserializeOwned>(
+    async fn post_signed<T: DeserializeOwned>(
         &self,
         endpoint: &str,
         params: Vec<(&str, String)>,
@@ -129,18 +135,19 @@ impl BinanceClient {
             all_params.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
         let query = build_signed_query(&params_ref, secret_key);
-        let url = format!("{}{}?{}", self.base_url, endpoint, query);
+        let url = format!("{}{}?{}", BASE_URL, endpoint, query);
 
         let response = self
             .client
             .post(&url)
             .header("X-MBX-APIKEY", access_key)
-            .send()?;
+            .send()
+            .await?;
 
-        self.handle_response(response)
+        self.handle_response(response).await
     }
 
-    fn delete_signed<T: DeserializeOwned>(
+    async fn put_signed<T: DeserializeOwned>(
         &self,
         endpoint: &str,
         params: Vec<(&str, String)>,
@@ -162,21 +169,56 @@ impl BinanceClient {
             all_params.iter().map(|(k, v)| (*k, v.as_str())).collect();
 
         let query = build_signed_query(&params_ref, secret_key);
-        let url = format!("{}{}?{}", self.base_url, endpoint, query);
+        let url = format!("{}{}?{}", BASE_URL, endpoint, query);
+
+        let response = self
+            .client
+            .put(&url)
+            .header("X-MBX-APIKEY", access_key)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    async fn delete_signed<T: DeserializeOwned>(
+        &self,
+        endpoint: &str,
+        params: Vec<(&str, String)>,
+    ) -> Result<T> {
+        let access_key = self
+            .access_key
+            .as_ref()
+            .ok_or_else(|| BinanceError::AuthError("API key not set".to_string()))?;
+        let secret_key = self
+            .secret_key
+            .as_ref()
+            .ok_or_else(|| BinanceError::AuthError("Secret key not set".to_string()))?;
+
+        let timestamp = get_timestamp().to_string();
+        let mut all_params = params;
+        all_params.push(("timestamp", timestamp));
+
+        let params_ref: Vec<(&str, &str)> =
+            all_params.iter().map(|(k, v)| (*k, v.as_str())).collect();
+
+        let query = build_signed_query(&params_ref, secret_key);
+        let url = format!("{}{}?{}", BASE_URL, endpoint, query);
 
         let response = self
             .client
             .delete(&url)
             .header("X-MBX-APIKEY", access_key)
-            .send()?;
+            .send()
+            .await?;
 
-        self.handle_response(response)
+        self.handle_response(response).await
     }
 
     // === Public API endpoints ===
 
-    pub fn get_symbol(&self) -> Result<Symbol> {
-        let exchange_info: ExchangeInfo = self.get_public("/fapi/v1/exchangeInfo", None)?;
+    pub async fn get_symbol(&self) -> Result<Symbol> {
+        let exchange_info: ExchangeInfo = self.get_public("/fapi/v1/exchangeInfo", None).await?;
         for sym in exchange_info.symbols {
             if sym.symbol.eq_ignore_ascii_case(&self.symbol) {
                 let mut t_s = Decimal::ZERO;
@@ -207,14 +249,19 @@ impl BinanceClient {
         Err(BinanceError::ParseError("Symbol not found".to_string()))
     }
 
-    pub fn get_candles(&self, interval: &str, limit: usize) -> Result<Vec<Candle>> {
+    pub fn get_symbol_sync(&self) -> Result<Symbol> {
+        self.runtime.block_on(self.get_symbol())
+    }
+
+    pub async fn get_candles(&self, interval: &str, limit: usize) -> Result<Vec<Candle>> {
         let limit_str = limit.to_string();
         let params: Vec<(&str, &str)> = vec![
             ("symbol", self.symbol.as_str()),
             ("interval", interval),
             ("limit", limit_str.as_str()),
         ];
-        let data: Vec<serde_json::Value> = self.get_public("/fapi/v1/klines", Some(&params))?;
+        let data: Vec<serde_json::Value> =
+            self.get_public("/fapi/v1/klines", Some(&params)).await?;
 
         let candles: Vec<Candle> = data
             .iter()
@@ -231,9 +278,13 @@ impl BinanceClient {
         Ok(candles)
     }
 
+    pub fn get_candles_sync(&self, interval: &str, limit: usize) -> Result<Vec<Candle>> {
+        self.runtime.block_on(self.get_candles(interval, limit))
+    }
+
     // === Private API endpoints (require authentication) ===
 
-    pub fn place_order(&self, order: NewOrder) -> Result<Order> {
+    pub async fn place_order(&self, order: NewOrder) -> Result<Order> {
         let order_side = match order.order_side {
             OrderSide::Buy => "BUY",
             OrderSide::Sell => "SELL",
@@ -262,7 +313,7 @@ impl BinanceClient {
             params.push(("timeInForce", "GTC".to_string()));
         };
 
-        let resp: BinanceOrder = self.post_signed("/fapi/v1/order", params)?;
+        let resp: BinanceOrder = self.post_signed("/fapi/v1/order", params).await?;
 
         let order_status = match resp.status.as_str() {
             "NEW" => OrderStatus::Pending,
@@ -272,12 +323,15 @@ impl BinanceClient {
 
         Ok(Order {
             id: resp.order_id.to_string(),
-            order_type: order.order_type,
+            order_type: order.order_type.clone(),
             order_side: order.order_side,
             order_status,
             quantity: resp.orig_qty,
             executed_quantity: resp.executed_qty,
-            price: resp.price,
+            price: match &order.order_type {
+                OrderType::Stop => resp.stop_price,
+                _ => resp.price,
+            },
             average_price: resp.avg_price,
             commission: resp.commission(),
             timestamp: Timestamp::from_milliseconds(resp.update_time),
@@ -285,12 +339,16 @@ impl BinanceClient {
         })
     }
 
-    pub fn cancel_order(&self, order_id: &str) -> Result<Order> {
+    pub fn place_order_sync(&self, order: NewOrder) -> Result<Order> {
+        self.runtime.block_on(self.place_order(order))
+    }
+
+    pub async fn cancel_order(&self, order_id: &str) -> Result<Order> {
         let params = vec![
             ("symbol", self.symbol.clone()),
             ("orderId", order_id.to_string()),
         ];
-        let resp: BinanceOrder = self.delete_signed("/fapi/v1/order", params)?;
+        let resp: BinanceOrder = self.delete_signed("/fapi/v1/order", params).await?;
 
         let order_type = match resp.order_type.as_str() {
             "MARKET" => OrderType::Market,
@@ -318,6 +376,21 @@ impl BinanceClient {
             timestamp: Timestamp::from_milliseconds(resp.update_time),
             is_update: false,
         })
+    }
+
+    pub fn cancel_order_sync(&self, order_id: &str) -> Result<Order> {
+        self.runtime.block_on(self.cancel_order(order_id))
+    }
+
+    pub async fn create_listen_key(&self) -> Result<String> {
+        let listen_key_resp: ListenKey = self.post_signed("/fapi/v1/listenKey", vec![]).await?;
+        Ok(listen_key_resp.listen_key)
+    }
+
+    pub async fn refresh_listen_key(&self) -> Result<()> {
+        self.put_signed::<ListenKey>("/fapi/v1/listenKey", vec![])
+            .await?;
+        Ok(())
     }
 }
 
@@ -366,6 +439,8 @@ pub struct BinanceOrder {
     #[serde(rename = "orderId")]
     pub order_id: u64,
     pub price: Decimal,
+    #[serde(rename = "stopPrice")]
+    pub stop_price: Decimal,
     #[serde(rename = "origQty")]
     pub orig_qty: Decimal,
     #[serde(rename = "executedQty")]
@@ -389,4 +464,10 @@ impl BinanceOrder {
         };
         self.executed_qty * self.avg_price * rate
     }
+}
+
+#[derive(Deserialize)]
+struct ListenKey {
+    #[serde(rename = "listenKey")]
+    listen_key: String,
 }

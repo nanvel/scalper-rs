@@ -8,10 +8,7 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::str::FromStr;
-use std::sync::{Arc, RwLock};
-use tokio_tungstenite::tungstenite::http;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
-use toml::value::Time;
 
 #[derive(Debug, Deserialize)]
 struct KlineEvent {
