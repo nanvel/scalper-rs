@@ -1,5 +1,5 @@
 use crate::models::Timestamp;
-use std::collections::VecDeque;
+use console::{Term, style};
 use std::sync::mpsc::Receiver;
 
 #[derive(Debug, Clone)]
@@ -13,48 +13,47 @@ pub struct Log {
     pub level: LogLevel,
     pub message: String,
     pub created_at: Timestamp,
-    pub duration: u32,
 }
 
 impl Log {
-    pub fn new(level: LogLevel, message: String, duration: Option<u32>) -> Self {
+    pub fn new(level: LogLevel, message: String) -> Self {
         Log {
-            level: LogLevel::Info,
+            level,
             message,
             created_at: Timestamp::now(),
-            duration: duration.unwrap_or(10),
         }
-    }
-
-    pub fn is_expired(&self) -> bool {
-        let now = Timestamp::now();
-        let elapsed = now.seconds() - self.created_at.seconds();
-        elapsed >= self.duration as u64
     }
 }
 
 pub struct LogManager {
-    active_logs: VecDeque<Log>,
     receiver: Receiver<Log>,
+    term: Term,
 }
 
 impl LogManager {
-    pub fn new(receiver: Receiver<Log>) -> Self {
-        LogManager {
-            active_logs: VecDeque::new(),
-            receiver,
-        }
+    pub fn new(receiver: Receiver<Log>, term: Term) -> Self {
+        LogManager { receiver, term }
     }
 
     pub fn update(&mut self) {
         while let Ok(alert) = self.receiver.try_recv() {
-            self.active_logs.push_back(alert);
+            match alert.level {
+                LogLevel::Info => {
+                    let _ = self.term.write_line(&format!(
+                        "[INFO] {} {}",
+                        alert.created_at.to_utc_string(),
+                        alert.message
+                    ));
+                }
+                LogLevel::Error => {
+                    let _ = self.term.write_line(&format!(
+                        "{} {} {}",
+                        style("[ERROR]").red(),
+                        alert.created_at.to_utc_string(),
+                        alert.message
+                    ));
+                }
+            }
         }
-
-        self.active_logs.retain(|alert| !alert.is_expired());
-    }
-
-    pub fn get_active_alerts(&self) -> &VecDeque<Log> {
-        &self.active_logs
     }
 }

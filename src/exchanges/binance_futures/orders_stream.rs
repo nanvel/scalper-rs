@@ -100,7 +100,7 @@ pub async fn start_orders_stream(
             }
             Err(er) => {
                 logs_sender
-                    .send(Log::new(LogLevel::Info, format!("{:?}", er), Some(10)))
+                    .send(Log::new(LogLevel::Error, format!("{:?}", er)))
                     .ok();
 
                 loop {
@@ -120,7 +120,6 @@ fn process_filled_order(
     //     .send(Log::new(
     //         LogLevel::Info,
     //         format!("Filled {:?}", er.order_id),
-    //         Some(10),
     //     ))
     //     .ok();
 
