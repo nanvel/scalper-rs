@@ -294,6 +294,43 @@ impl BinanceClient {
         Ok(result)
     }
 
+    pub async fn get_open_interest(&self) -> Result<(Timestamp, Decimal)> {
+        let params: Vec<(&str, &str)> = vec![("symbol", self.symbol.as_str())];
+
+        let resp: OpenInterestCurrentEntry = self
+            .get_public("/fapi/v1/openInterest", Some(&params))
+            .await?;
+
+        Ok((
+            Timestamp::from_milliseconds(resp.timestamp),
+            resp.open_interest,
+        ))
+    }
+
+    pub async fn get_open_interest_hist(&self) -> Result<Vec<(Timestamp, Decimal)>> {
+        let params: Vec<(&str, &str)> = vec![
+            ("symbol", self.symbol.as_str()),
+            ("period", "5m"),
+            ("limit", "500"),
+        ];
+
+        let resp: Vec<OpenInterestHistEntry> = self
+            .get_public("/futures/data/openInterestHist", Some(&params))
+            .await?;
+
+        let result = resp
+            .into_iter()
+            .map(|entry| {
+                (
+                    Timestamp::from_milliseconds(entry.timestamp),
+                    entry.open_interest,
+                )
+            })
+            .collect();
+
+        Ok(result)
+    }
+
     // === Private API endpoints (require authentication) ===
 
     pub async fn place_order(&self, order: NewOrder) -> Result<Order> {
@@ -490,4 +527,20 @@ pub struct DepthSnapshot {
     pub last_update_id: u64,
     pub bids: Vec<[String; 2]>,
     pub asks: Vec<[String; 2]>,
+}
+
+#[derive(Deserialize)]
+struct OpenInterestHistEntry {
+    #[serde(rename = "sumOpenInterest")]
+    open_interest: Decimal,
+    #[serde(rename = "timestamp")]
+    timestamp: u64,
+}
+
+#[derive(Deserialize)]
+struct OpenInterestCurrentEntry {
+    #[serde(rename = "openInterest")]
+    open_interest: Decimal,
+    #[serde(rename = "time")]
+    timestamp: u64,
 }

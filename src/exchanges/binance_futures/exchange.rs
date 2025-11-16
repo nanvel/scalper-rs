@@ -100,8 +100,8 @@ impl Exchange for BinanceFuturesExchange {
                     }
 
                     res = start_open_interest_stream(
+                        &client_clone,
                         open_interest_clone,
-                        &symbol_clone,
                     ) => {
                         if let Err(e) = res {
                             eprintln!("Open interest stream error: {:?}", e);
