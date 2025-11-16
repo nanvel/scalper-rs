@@ -63,9 +63,6 @@ impl Exchange for BinanceFuturesExchange {
         let logs_sender_clone = self.logs_sender.clone().unwrap();
         let orders_sender_clone = self.orders_sender.clone().unwrap();
 
-        let access_key_clone = self.access_key.clone();
-        let secret_key_clone = self.secret_key.clone();
-
         let client_clone = self.client.clone();
 
         let keep_listen_key_alive = async |client: &BinanceClient| {

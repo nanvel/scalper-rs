@@ -13,7 +13,7 @@ use models::{
     ColorSchema, Config, Interval, Layout, LogManager, OrderSide, OrderType, PxPerTick, Sizes,
 };
 use raqote::DrawTarget;
-use rust_decimal::{Decimal, prelude::FromStr};
+use rust_decimal::Decimal;
 use std::sync::mpsc;
 
 fn main() {
@@ -128,20 +128,19 @@ fn main() {
             }
         }
 
-        if let (new_width, new_height) = window.get_size() {
-            if new_width != window_width || new_height != window_height {
-                window_width = new_width;
-                window_height = new_height;
+        let (new_width, new_height) = window.get_size();
+        if new_width != window_width || new_height != window_height {
+            window_width = new_width;
+            window_height = new_height;
 
-                dt = DrawTarget::new(window_width as i32, window_height as i32);
-                layout = Layout::new(window_width as i32, window_height as i32);
-                candles_renderer = CandlesRenderer::new(layout.candles_area);
-                order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
-                order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
-                status_renderer = StatusRenderer::new(layout.status_area);
+            dt = DrawTarget::new(window_width as i32, window_height as i32);
+            layout = Layout::new(window_width as i32, window_height as i32);
+            candles_renderer = CandlesRenderer::new(layout.candles_area);
+            order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
+            order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
+            status_renderer = StatusRenderer::new(layout.status_area);
 
-                force_redraw = true;
-            }
+            force_redraw = true;
         }
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
@@ -292,7 +291,7 @@ fn main() {
 
         if bid.is_some() && !sl_triggered {
             if let Some(sl_pnl) = config.sl_pnl {
-                if orders.pnl(bid, ask) < sl_pnl {
+                if orders.pnl(bid, ask) < -sl_pnl.abs() {
                     sl_triggered = true;
                     let balance = orders.base_balance();
                     if balance != Decimal::ZERO {

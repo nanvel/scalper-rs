@@ -71,7 +71,7 @@ impl Config {
 
         let mut config: Config = toml::from_str(&contents)?;
 
-        let mut cli_overrides = Cli::parse();
+        let cli_overrides = Cli::parse();
         config.symbol = cli_overrides.symbol.clone();
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);
