@@ -282,6 +282,18 @@ impl BinanceClient {
         self.runtime.block_on(self.get_candles(interval, limit))
     }
 
+    pub async fn get_depth(&self, limit: usize) -> Result<DepthSnapshot> {
+        let limit_str = limit.to_string();
+        let params: Vec<(&str, &str)> = vec![
+            ("symbol", self.symbol.as_str()),
+            ("limit", limit_str.as_str()),
+        ];
+
+        let result: DepthSnapshot = self.get_public("/fapi/v1/depth", Some(&params)).await?;
+
+        Ok(result)
+    }
+
     // === Private API endpoints (require authentication) ===
 
     pub async fn place_order(&self, order: NewOrder) -> Result<Order> {
@@ -470,4 +482,12 @@ impl BinanceOrder {
 struct ListenKey {
     #[serde(rename = "listenKey")]
     listen_key: String,
+}
+
+#[derive(Deserialize)]
+pub struct DepthSnapshot {
+    #[serde(rename = "lastUpdateId")]
+    pub last_update_id: u64,
+    pub bids: Vec<[String; 2]>,
+    pub asks: Vec<[String; 2]>,
 }

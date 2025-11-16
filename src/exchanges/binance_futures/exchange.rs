@@ -7,7 +7,6 @@ use crate::models::{
     CandlesState, Interval, Log, NewOrder, OpenInterestState, Order, OrderBookState,
     OrderFlowState, SharedCandlesState, SharedState, Symbol,
 };
-use std::io::repeat;
 use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
 use std::thread;
 use std::time::Duration;
@@ -88,6 +87,7 @@ impl Exchange for BinanceFuturesExchange {
             rt.block_on(async move {
                 tokio::select! {
                     res = start_market_stream(
+                        &client_clone,
                         &symbol_clone,
                         500,
                         candles_clone,
