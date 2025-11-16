@@ -1,10 +1,9 @@
-use crate::exchanges::base::USER_AGENT;
+use super::client::BinanceClient;
 use crate::models::{
     Candle, CandlesState, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState,
     Timestamp,
 };
 use futures_util::stream::StreamExt;
-use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::str::FromStr;
@@ -35,14 +34,6 @@ struct KlineData {
 }
 
 #[derive(Debug, Deserialize)]
-struct DepthSnapshot {
-    #[serde(rename = "lastUpdateId")]
-    last_update_id: u64,
-    bids: Vec<[String; 2]>,
-    asks: Vec<[String; 2]>,
-}
-
-#[derive(Debug, Deserialize)]
 struct DepthUpdateEvent {
     #[serde(rename = "u")]
     update_id: u64,
@@ -67,14 +58,13 @@ struct AggTradeEvent {
 }
 
 pub async fn start_market_stream(
+    client: &BinanceClient,
     symbol: &String,
     dom_limit: usize,
     shared_candles_state: SharedCandlesState,
     shared_dom_state: SharedOrderBookState,
     shared_order_flow_state: SharedOrderFlowState,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let http_client = Client::builder().user_agent(USER_AGENT).build()?;
-
     let ws_url = format!(
         "wss://fstream.binance.com/stream?streams={}@kline_1m/{}@depth@100ms/{}@aggTrade",
         symbol.to_lowercase(),
@@ -84,16 +74,14 @@ pub async fn start_market_stream(
     let (ws_stream, _) = connect_async(ws_url).await?;
     let (_write, mut read) = ws_stream.split();
 
-    let dom_url = format!(
-        "https://fapi.binance.com/fapi/v1/depth?symbol={}&limit={}",
-        symbol, dom_limit
-    );
-    let response = http_client.get(&dom_url).send().await?;
-    let snapshot: DepthSnapshot = response.json().await?;
+    let snapshot = client.get_depth(dom_limit).await?;
 
     let mut candles_state_1m = CandlesState::new(60, Interval::M1);
 
-    for c in load_1m_candles(&http_client, symbol, candles_state_1m.capacity()).await? {
+    for c in client
+        .get_candles("1m", candles_state_1m.capacity())
+        .await?
+    {
         candles_state_1m.push(c);
     }
 
@@ -212,32 +200,4 @@ fn extract_inner(text: &str) -> Option<serde_json::Value> {
         }
         Err(_) => None,
     }
-}
-
-async fn load_1m_candles(
-    client: &Client,
-    symbol: &String,
-    limit: usize,
-) -> Result<Vec<Candle>, Box<dyn std::error::Error>> {
-    let url = format!(
-        "https://fapi.binance.com/fapi/v1/klines?symbol={}&interval=1m&limit={}",
-        symbol, limit
-    );
-    let response = client.get(&url).send().await?;
-    let data: Vec<Vec<serde_json::Value>> = response.json().await?;
-
-    let mut candles = Vec::new();
-    for item in data {
-        let candle = Candle {
-            open_time: Timestamp::from_milliseconds(item[0].as_u64().unwrap()),
-            open: Decimal::from_str(item[1].as_str().unwrap()).unwrap(),
-            high: Decimal::from_str(item[2].as_str().unwrap()).unwrap(),
-            low: Decimal::from_str(item[3].as_str().unwrap()).unwrap(),
-            close: Decimal::from_str(item[4].as_str().unwrap()).unwrap(),
-            volume: Decimal::from_str(item[5].as_str().unwrap()).unwrap(),
-        };
-        candles.push(candle);
-    }
-
-    Ok(candles)
 }

@@ -12,3 +12,5 @@ impl Display for ExchangeError {
         }
     }
 }
+
+impl std::error::Error for ExchangeError {}

@@ -4,6 +4,7 @@ mod models;
 
 use crate::exchanges::ExchangeFactory;
 use crate::models::{NewOrder, Orders};
+use console::Term;
 use graphics::{
     CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
 };
@@ -11,20 +12,11 @@ use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
     ColorSchema, Config, Interval, Layout, LogManager, OrderSide, OrderType, PxPerTick, Sizes,
 };
-use raqote::{DrawTarget, LineCap};
+use raqote::DrawTarget;
 use rust_decimal::{Decimal, prelude::FromStr};
-use std::env;
 use std::sync::mpsc;
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-
-    if args.len() < 2 {
-        eprintln!("Error: Symbol argument is required");
-        eprintln!("Usage: {} <SYMBOL>", args[0]);
-        std::process::exit(1);
-    }
-
     let config = Config::load().unwrap_or_else(|err| {
         eprintln!("Error loading config: {}", err);
         std::process::exit(1);
@@ -33,7 +25,7 @@ fn main() {
     let mut interval = Interval::M1;
     let mut exchange = ExchangeFactory::create(
         "binance_usd_futures",
-        args[1].clone(),
+        config.symbol.clone(),
         interval,
         200,
         &config,
@@ -49,7 +41,7 @@ fn main() {
             std::process::exit(1);
         });
 
-    let mut logs_manager = LogManager::new(messages_receiver);
+    let mut logs_manager = LogManager::new(messages_receiver, Term::stdout());
 
     let mut window_width = config.window_width;
     let mut window_height = config.window_height;
@@ -369,13 +361,8 @@ fn main() {
             &orders,
             &bid,
             &ask,
+            &logs_manager.status,
         );
-        let active_alerts = logs_manager.get_active_alerts();
-        if active_alerts.is_empty() {
-            window.set_title(&format!("Scalper - {}", symbol.slug));
-        } else {
-            window.set_title(&active_alerts.iter().next().unwrap().message);
-        }
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
         window

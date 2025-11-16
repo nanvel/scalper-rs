@@ -1,3 +1,4 @@
+use chrono::{TimeZone, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -27,6 +28,11 @@ impl Timestamp {
 
     pub fn milliseconds(&self) -> u64 {
         self.0
+    }
+
+    pub fn to_utc_string(&self) -> String {
+        let dt = Utc.timestamp_millis_opt(self.0 as i64).unwrap();
+        dt.format("%Y-%m-%dT%H:%M:%S").to_string()
     }
 }
 
