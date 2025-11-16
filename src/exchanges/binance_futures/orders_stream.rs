@@ -47,7 +47,7 @@ pub struct ExecutionReport {
 pub async fn start_orders_stream(
     client: &BinanceClient,
     symbol: &String,
-    logs_sender: Sender<Log>,
+    logs_sender: &Sender<Log>,
     orders_sender: Sender<Order>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if !client.has_auth() {
@@ -79,7 +79,7 @@ pub async fn start_orders_stream(
                                 {
                                     if let Some(sym) = &er.symbol {
                                         if sym.eq_ignore_ascii_case(&symbol) {
-                                            process_filled_order(&er, &logs_sender, &orders_sender)
+                                            process_filled_order(&er, &orders_sender)
                                         }
                                     }
                                 }
@@ -114,18 +114,7 @@ pub async fn start_orders_stream(
     }
 }
 
-fn process_filled_order(
-    er: &ExecutionReport,
-    logs_sender: &Sender<Log>,
-    orders_sender: &Sender<Order>,
-) {
-    // logs_sender
-    //     .send(Log::new(
-    //         LogLevel::Info,
-    //         format!("Filled {:?}", er.order_id),
-    //     ))
-    //     .ok();
-
+fn process_filled_order(er: &ExecutionReport, orders_sender: &Sender<Order>) {
     let order_side = match &er.side {
         Some(s) if s.eq("BUY") => OrderSide::Buy,
         Some(s) if s.eq("SELL") => OrderSide::Sell,

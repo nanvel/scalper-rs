@@ -4,7 +4,7 @@ use super::open_interest_stream::start_open_interest_stream;
 use super::orders_stream::start_orders_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
-    CandlesState, Interval, Log, NewOrder, OpenInterestState, Order, OrderBookState,
+    CandlesState, Interval, Log, LogLevel, NewOrder, OpenInterestState, Order, OrderBookState,
     OrderFlowState, SharedCandlesState, SharedState, Symbol,
 };
 use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
@@ -92,7 +92,7 @@ impl Exchange for BinanceFuturesExchange {
                         order_flow_clone,
                     ) => {
                         if let Err(e) = res {
-                            eprintln!("Market stream error: {:?}", e);
+                            logs_sender_clone.send(Log::new(LogLevel::Error(true, "CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
@@ -101,25 +101,25 @@ impl Exchange for BinanceFuturesExchange {
                         open_interest_clone,
                     ) => {
                         if let Err(e) = res {
-                            eprintln!("Open interest stream error: {:?}", e);
+                            logs_sender_clone.send(Log::new(LogLevel::Error(true, "CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
                     res = start_orders_stream(
                         &client_clone,
                         &symbol_clone,
-                        logs_sender_clone,
+                        &logs_sender_clone,
                         orders_sender_clone,
                     ) => {
                         if let Err(e) = res {
-                            eprintln!("Orders stream error: {:?}", e);
+                            logs_sender_clone.send(Log::new(LogLevel::Error(true, "CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
                     _ = keep_listen_key_alive(&client_clone) => {}
 
                     _ = shutdown_rx => {
-                        println!("Shutting down market stream listener");
+                        logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string())).ok();
                     }
                 }
 
