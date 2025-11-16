@@ -9,6 +9,8 @@ use std::path::PathBuf;
 pub struct Config {
     #[serde(default)]
     pub symbol: String,
+    #[serde(default = "default_exchange")]
+    pub exchange: String,
     #[serde(default)]
     pub theme: Theme,
     #[serde(default = "default_width")]
@@ -35,9 +37,15 @@ struct Cli {
     #[arg(index = 1)]
     symbol: String,
     #[arg(long)]
+    exchange: Option<String>,
+    #[arg(long)]
     theme: Option<String>,
     #[arg(long)]
     sl_pnl: Option<Decimal>,
+}
+
+fn default_exchange() -> String {
+    "binance_usd_futures".to_string()
 }
 
 fn default_size() -> Option<Decimal> {
@@ -73,6 +81,9 @@ impl Config {
 
         let cli_overrides = Cli::parse();
         config.symbol = cli_overrides.symbol.clone();
+        if let Some(exchange) = cli_overrides.exchange {
+            config.exchange = exchange;
+        }
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);
         }

@@ -24,7 +24,7 @@ fn main() {
 
     let mut interval = Interval::M1;
     let mut exchange = ExchangeFactory::create(
-        "binance_usd_futures",
+        config.exchange.as_str(),
         config.symbol.clone(),
         interval,
         200,
