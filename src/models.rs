@@ -21,6 +21,7 @@ pub use color_schema::ColorSchema;
 pub use config::Config;
 pub use interval::Interval;
 pub use layout::{Area, Layout};
+pub use logs::Status;
 pub use logs::{Log, LogLevel, LogManager};
 pub use open_interest::{OpenInterestState, SharedOpenInterestState};
 pub use order_book::{OrderBookState, SharedOrderBookState};

@@ -5,7 +5,14 @@ use std::sync::mpsc::Receiver;
 #[derive(Debug, Clone)]
 pub enum LogLevel {
     Info,
-    Error,
+    Error(bool, String), // critical, message
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Status {
+    Ok,
+    Warning(String),
+    Critical(String),
 }
 
 #[derive(Debug, Clone)]
@@ -28,11 +35,16 @@ impl Log {
 pub struct LogManager {
     receiver: Receiver<Log>,
     term: Term,
+    pub status: Status,
 }
 
 impl LogManager {
     pub fn new(receiver: Receiver<Log>, term: Term) -> Self {
-        LogManager { receiver, term }
+        LogManager {
+            receiver,
+            term,
+            status: Status::Ok,
+        }
     }
 
     pub fn update(&mut self) {
@@ -45,13 +57,18 @@ impl LogManager {
                         alert.message
                     ));
                 }
-                LogLevel::Error => {
+                LogLevel::Error(is_critical, message) => {
                     let _ = self.term.write_line(&format!(
                         "{} {} {}",
                         style("[ERROR]").red(),
                         alert.created_at.to_utc_string(),
                         alert.message
                     ));
+                    if is_critical {
+                        self.status = Status::Critical(message);
+                    } else if let Status::Ok = self.status {
+                        self.status = Status::Warning(message);
+                    }
                 }
             }
         }

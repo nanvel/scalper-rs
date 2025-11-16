@@ -100,7 +100,10 @@ pub async fn start_orders_stream(
             }
             Err(er) => {
                 logs_sender
-                    .send(Log::new(LogLevel::Error, format!("{:?}", er)))
+                    .send(Log::new(
+                        LogLevel::Error(false, "AUTH".to_string()),
+                        format!("{:?}", er),
+                    ))
                     .ok();
 
                 loop {

@@ -361,6 +361,7 @@ fn main() {
             &orders,
             &bid,
             &ask,
+            &logs_manager.status,
         );
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
