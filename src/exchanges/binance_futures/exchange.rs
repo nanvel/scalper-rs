@@ -4,7 +4,7 @@ use super::open_interest_stream::start_open_interest_stream;
 use super::orders_stream::start_orders_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
-    CandlesState, Interval, Log, NewOrder, OpenInterestState, Order, OrderBookState,
+    CandlesState, Interval, Log, LogLevel, NewOrder, OpenInterestState, Order, OrderBookState,
     OrderFlowState, SharedCandlesState, SharedState, Symbol,
 };
 use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
@@ -19,10 +19,8 @@ pub struct BinanceFuturesExchange {
     symbol: String,
     interval: Interval,
     candles_limit: usize,
-    access_key: Option<String>,
-    secret_key: Option<String>,
-    logs_sender: Option<Sender<Log>>,
-    orders_sender: Option<Sender<Order>>,
+    logs_sender: Sender<Log>,
+    orders_sender: Sender<Order>,
     shared_candles_state: Option<SharedCandlesState>,
     client: Arc<BinanceClient>,
     stop_tx: Option<oneshot::Sender<()>>,
@@ -30,10 +28,13 @@ pub struct BinanceFuturesExchange {
 }
 
 impl Exchange for BinanceFuturesExchange {
-    fn start(
-        &mut self,
-    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>
-    {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn start(&mut self) -> Result<(Symbol, SharedState), Box<dyn std::error::Error>> {
+        let symbol = self.client.get_symbol_sync()?;
+
         let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(
             self.candles_limit,
             self.interval.clone(),
@@ -42,17 +43,7 @@ impl Exchange for BinanceFuturesExchange {
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
         let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
-        let (logs_sender, logs_receiver) = mpsc::channel();
-        let (orders_sender, orders_receiver) = mpsc::channel();
-        self.logs_sender = Some(logs_sender);
-        self.orders_sender = Some(orders_sender);
         self.shared_candles_state = Some(shared_candles_state.clone());
-
-        let symbol = self.client.get_symbol_sync()?;
-
-        self.set_interval(self.interval.clone());
-
-        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let symbol_clone = self.symbol.clone();
         let candles_clone = shared_candles_state.clone();
@@ -60,22 +51,25 @@ impl Exchange for BinanceFuturesExchange {
         let order_flow_clone = shared_order_flow_state.clone();
         let open_interest_clone = shared_open_interest_state.clone();
 
-        let logs_sender_clone = self.logs_sender.clone().unwrap();
-        let orders_sender_clone = self.orders_sender.clone().unwrap();
-
-        let access_key_clone = self.access_key.clone();
-        let secret_key_clone = self.secret_key.clone();
+        let logs_sender_clone = self.logs_sender.clone();
+        let orders_sender_clone = self.orders_sender.clone();
 
         let client_clone = self.client.clone();
 
-        let keep_listen_key_alive = async |client: &BinanceClient| {
+        self.set_interval(self.interval);
+
+        let keep_listen_key_alive = async |client: &BinanceClient, logs_sender: &Sender<Log>| {
             loop {
                 sleep(Duration::from_mins(30)).await;
                 if !client.has_auth() {
                     let _ = client.refresh_listen_key().await;
+                    let _ = logs_sender
+                        .send(Log::new(LogLevel::Info, "Refreshed listen key".to_string()));
                 }
             }
         };
+
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let handle = thread::spawn(move || {
             let rt = runtime::Builder::new_multi_thread()
@@ -95,7 +89,7 @@ impl Exchange for BinanceFuturesExchange {
                         order_flow_clone,
                     ) => {
                         if let Err(e) = res {
-                            eprintln!("Market stream error: {:?}", e);
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
@@ -104,25 +98,25 @@ impl Exchange for BinanceFuturesExchange {
                         open_interest_clone,
                     ) => {
                         if let Err(e) = res {
-                            eprintln!("Open interest stream error: {:?}", e);
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
                     res = start_orders_stream(
                         &client_clone,
                         &symbol_clone,
-                        logs_sender_clone,
+                        &logs_sender_clone,
                         orders_sender_clone,
                     ) => {
                         if let Err(e) = res {
-                            eprintln!("Orders stream error: {:?}", e);
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
-                    _ = keep_listen_key_alive(&client_clone) => {}
+                    _ = keep_listen_key_alive(&client_clone, &logs_sender_clone) => {}
 
                     _ = shutdown_rx => {
-                        println!("Shutting down market stream listener");
+                        logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string())).ok();
                     }
                 }
 
@@ -141,8 +135,6 @@ impl Exchange for BinanceFuturesExchange {
                 open_interest: shared_open_interest_state,
                 order_flow: shared_order_flow_state,
             },
-            orders_receiver,
-            logs_receiver,
         ))
     }
 
@@ -182,25 +174,21 @@ impl Exchange for BinanceFuturesExchange {
     }
 
     fn place_order(&self, new_order: NewOrder) -> () {
-        if let Some(orders_sender) = &self.orders_sender {
-            let client = self.client.clone();
-            let sender_clone = orders_sender.clone();
-            thread::spawn(move || {
-                let order = client.place_order_sync(new_order).unwrap();
-                sender_clone.send(order).unwrap();
-            });
-        }
+        let client = self.client.clone();
+        let sender_clone = self.orders_sender.clone();
+        thread::spawn(move || {
+            let order = client.place_order_sync(new_order).unwrap();
+            sender_clone.send(order).unwrap();
+        });
     }
 
     fn cancel_order(&self, order_id: String) -> () {
-        if let Some(orders_sender) = &self.orders_sender {
-            let client = self.client.clone();
-            let sender_clone = orders_sender.clone();
-            thread::spawn(move || {
-                let order = client.cancel_order_sync(&order_id).unwrap();
-                sender_clone.send(order).unwrap();
-            });
-        }
+        let client = self.client.clone();
+        let sender_clone = self.orders_sender.clone();
+        thread::spawn(move || {
+            let order = client.cancel_order_sync(&order_id).unwrap();
+            sender_clone.send(order).unwrap();
+        });
     }
 }
 
@@ -209,6 +197,8 @@ impl BinanceFuturesExchange {
         symbol: String,
         interval: Interval,
         candles_limit: usize,
+        orders_sender: Sender<Order>,
+        logs_sender: Sender<Log>,
         access_key: Option<String>,
         secret_key: Option<String>,
     ) -> Self {
@@ -223,10 +213,8 @@ impl BinanceFuturesExchange {
             symbol,
             interval,
             candles_limit,
-            access_key,
-            secret_key,
-            logs_sender: None,
-            orders_sender: None,
+            logs_sender,
+            orders_sender,
             shared_candles_state: None,
             client,
             stop_tx: None,

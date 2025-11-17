@@ -9,54 +9,6 @@ use serde::Deserialize;
 use std::str::FromStr;
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 
-#[derive(Debug, Deserialize)]
-struct KlineEvent {
-    #[serde(rename = "k")]
-    kline: KlineData,
-    #[serde(rename = "E")]
-    event_time: u64,
-}
-
-#[derive(Debug, Deserialize)]
-struct KlineData {
-    #[serde(rename = "t")]
-    start_time: u64,
-    #[serde(rename = "o")]
-    open: String,
-    #[serde(rename = "h")]
-    high: String,
-    #[serde(rename = "l")]
-    low: String,
-    #[serde(rename = "c")]
-    close: String,
-    #[serde(rename = "v")]
-    volume: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct DepthUpdateEvent {
-    #[serde(rename = "u")]
-    update_id: u64,
-    #[serde(rename = "b")]
-    bids: Vec<[String; 2]>,
-    #[serde(rename = "a")]
-    asks: Vec<[String; 2]>,
-    #[serde(rename = "E")]
-    event_time: u64,
-}
-
-#[derive(Debug, Deserialize)]
-struct AggTradeEvent {
-    #[serde(rename = "p")]
-    price: String,
-    #[serde(rename = "q")]
-    quantity: String,
-    #[serde(rename = "m")]
-    maker: bool,
-    #[serde(rename = "E")]
-    event_time: u64,
-}
-
 pub async fn start_market_stream(
     client: &BinanceClient,
     symbol: &String,
@@ -74,10 +26,7 @@ pub async fn start_market_stream(
     let (ws_stream, _) = connect_async(ws_url).await?;
     let (_write, mut read) = ws_stream.split();
 
-    let snapshot = client.get_depth(dom_limit).await?;
-
     let mut candles_state_1m = CandlesState::new(60, Interval::M1);
-
     for c in client
         .get_candles("1m", candles_state_1m.capacity())
         .await?
@@ -85,26 +34,27 @@ pub async fn start_market_stream(
         candles_state_1m.push(c);
     }
 
-    let bids: Vec<(Decimal, Decimal)> = snapshot
-        .bids
-        .iter()
-        .filter_map(|b| {
-            let price = Decimal::from_str(&b[0]).ok()?;
-            let qty = Decimal::from_str(&b[1]).ok()?;
-            Some((price, qty))
-        })
-        .collect();
-    let asks: Vec<(Decimal, Decimal)> = snapshot
-        .asks
-        .iter()
-        .filter_map(|a| {
-            let price = Decimal::from_str(&a[0]).ok()?;
-            let qty = Decimal::from_str(&a[1]).ok()?;
-            Some((price, qty))
-        })
-        .collect();
-
+    let depth_snapshot = client.get_depth(dom_limit).await?;
     {
+        let bids: Vec<(Decimal, Decimal)> = depth_snapshot
+            .bids
+            .iter()
+            .filter_map(|b| {
+                let price = Decimal::from_str(&b[0]).ok()?;
+                let qty = Decimal::from_str(&b[1]).ok()?;
+                Some((price, qty))
+            })
+            .collect();
+        let asks: Vec<(Decimal, Decimal)> = depth_snapshot
+            .asks
+            .iter()
+            .filter_map(|a| {
+                let price = Decimal::from_str(&a[0]).ok()?;
+                let qty = Decimal::from_str(&a[1]).ok()?;
+                Some((price, qty))
+            })
+            .collect();
+
         let mut buffer = shared_dom_state.write().unwrap();
         buffer.init_snapshot(bids, asks);
     }
@@ -115,7 +65,7 @@ pub async fn start_market_stream(
                 if let Some(data) = extract_inner(&text) {
                     if let Ok(event) = serde_json::from_value::<DepthUpdateEvent>(data.clone()) {
                         let mut buffer = shared_dom_state.write().unwrap();
-                        if event.update_id <= snapshot.last_update_id {
+                        if event.update_id <= depth_snapshot.last_update_id {
                             continue;
                         }
                         for b in event.bids.iter() {
@@ -200,4 +150,52 @@ fn extract_inner(text: &str) -> Option<serde_json::Value> {
         }
         Err(_) => None,
     }
+}
+
+#[derive(Deserialize)]
+struct KlineEvent {
+    #[serde(rename = "k")]
+    kline: KlineData,
+    #[serde(rename = "E")]
+    event_time: u64,
+}
+
+#[derive(Deserialize)]
+struct KlineData {
+    #[serde(rename = "t")]
+    start_time: u64,
+    #[serde(rename = "o")]
+    open: String,
+    #[serde(rename = "h")]
+    high: String,
+    #[serde(rename = "l")]
+    low: String,
+    #[serde(rename = "c")]
+    close: String,
+    #[serde(rename = "v")]
+    volume: String,
+}
+
+#[derive(Deserialize)]
+struct DepthUpdateEvent {
+    #[serde(rename = "u")]
+    update_id: u64,
+    #[serde(rename = "b")]
+    bids: Vec<[String; 2]>,
+    #[serde(rename = "a")]
+    asks: Vec<[String; 2]>,
+    #[serde(rename = "E")]
+    event_time: u64,
+}
+
+#[derive(Deserialize)]
+struct AggTradeEvent {
+    #[serde(rename = "p")]
+    price: String,
+    #[serde(rename = "q")]
+    quantity: String,
+    #[serde(rename = "m")]
+    maker: bool,
+    #[serde(rename = "E")]
+    event_time: u64,
 }

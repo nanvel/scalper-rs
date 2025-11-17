@@ -48,13 +48,6 @@ impl OrderBookState {
     pub fn ask(&self) -> Option<Decimal> {
         self.asks.keys().next().cloned()
     }
-
-    pub fn clear(&mut self) {
-        self.bids.clear();
-        self.asks.clear();
-        self.updated = Timestamp::now();
-        self.online = false;
-    }
 }
 
 pub type SharedOrderBookState = Arc<RwLock<OrderBookState>>;

@@ -137,6 +137,7 @@ impl CandlesState {
 #[cfg(test)]
 mod tests {
     use super::{Candle, CandlesState, Timestamp};
+    use crate::models::Interval;
     use rust_decimal::Decimal;
     use std::str::FromStr;
 
@@ -160,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_candles_buffer_push_and_to_vec() {
-        let mut buffer = CandlesState::new(3);
+        let mut buffer = CandlesState::new(3, Interval::M1);
 
         let candle1 = create_candle(1, "100.0", "110.0", "90.0", "105.0", "1000.0");
         let candle2 = create_candle(2, "105.0", "115.0", "95.0", "110.0", "1500.0");
