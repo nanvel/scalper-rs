@@ -56,7 +56,10 @@ pub async fn start_orders_stream(
                             break;
                         }
                         Err(e) => {
-                            eprintln!("account stream error: {}", e);
+                            logs_sender.send(Log::new(
+                                LogLevel::Warning("STREAM".to_string(), None),
+                                format!("{:?}", e),
+                            ))?;
                             sleep(Duration::from_secs(5)).await;
                             break;
                         }
@@ -65,12 +68,10 @@ pub async fn start_orders_stream(
                 }
             }
             Err(er) => {
-                logs_sender
-                    .send(Log::new(
-                        LogLevel::Error(false, "AUTH".to_string()),
-                        format!("{:?}", er),
-                    ))
-                    .ok();
+                logs_sender.send(Log::new(
+                    LogLevel::Error("AUTH".to_string()),
+                    format!("{:?}", er),
+                ))?;
 
                 loop {
                     sleep(Duration::from_mins(5)).await;

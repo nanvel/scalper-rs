@@ -17,6 +17,11 @@ use rust_decimal::Decimal;
 use std::sync::mpsc;
 
 fn main() {
+    let (logs_sender, logs_receiver) = mpsc::channel();
+    let (orders_sender, orders_receiver) = mpsc::channel();
+
+    let mut logs_manager = LogManager::new(logs_receiver, Term::stdout());
+
     let config = Config::load().unwrap_or_else(|err| {
         eprintln!("Error loading config: {}", err);
         std::process::exit(1);
@@ -29,19 +34,18 @@ fn main() {
         interval,
         200,
         &config,
+        logs_sender,
+        orders_sender,
     )
     .unwrap_or_else(|err| {
         eprintln!("Error creating exchange: {}", err);
         std::process::exit(1);
     });
 
-    let (symbol, shared_state, orders_receiver, messages_receiver) =
-        exchange.start().unwrap_or_else(|err| {
-            eprintln!("Error starting streams: {}", err);
-            std::process::exit(1);
-        });
-
-    let mut logs_manager = LogManager::new(messages_receiver, Term::stdout());
+    let (symbol, shared_state) = exchange.start().unwrap_or_else(|err| {
+        eprintln!("Error starting streams: {}", err);
+        std::process::exit(1);
+    });
 
     let mut window_width = config.window_width;
     let mut window_height = config.window_height;
@@ -360,7 +364,7 @@ fn main() {
             &orders,
             &bid,
             &ask,
-            &logs_manager.status,
+            &logs_manager.status(),
         );
 
         let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();

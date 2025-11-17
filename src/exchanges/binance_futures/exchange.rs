@@ -19,8 +19,8 @@ pub struct BinanceFuturesExchange {
     symbol: String,
     interval: Interval,
     candles_limit: usize,
-    logs_sender: Option<Sender<Log>>,
-    orders_sender: Option<Sender<Order>>,
+    logs_sender: Sender<Log>,
+    orders_sender: Sender<Order>,
     shared_candles_state: Option<SharedCandlesState>,
     client: Arc<BinanceClient>,
     stop_tx: Option<oneshot::Sender<()>>,
@@ -32,10 +32,7 @@ impl Exchange for BinanceFuturesExchange {
         self.name
     }
 
-    fn start(
-        &mut self,
-    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>
-    {
+    fn start(&mut self) -> Result<(Symbol, SharedState), Box<dyn std::error::Error>> {
         let symbol = self.client.get_symbol_sync()?;
 
         let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(
@@ -46,10 +43,6 @@ impl Exchange for BinanceFuturesExchange {
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
         let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
 
-        let (logs_sender, logs_receiver) = mpsc::channel();
-        let (orders_sender, orders_receiver) = mpsc::channel();
-        self.logs_sender = Some(logs_sender);
-        self.orders_sender = Some(orders_sender);
         self.shared_candles_state = Some(shared_candles_state.clone());
 
         let symbol_clone = self.symbol.clone();
@@ -58,18 +51,20 @@ impl Exchange for BinanceFuturesExchange {
         let order_flow_clone = shared_order_flow_state.clone();
         let open_interest_clone = shared_open_interest_state.clone();
 
-        let logs_sender_clone = self.logs_sender.clone().unwrap();
-        let orders_sender_clone = self.orders_sender.clone().unwrap();
+        let logs_sender_clone = self.logs_sender.clone();
+        let orders_sender_clone = self.orders_sender.clone();
 
         let client_clone = self.client.clone();
 
         self.set_interval(self.interval);
 
-        let keep_listen_key_alive = async |client: &BinanceClient| {
+        let keep_listen_key_alive = async |client: &BinanceClient, logs_sender: &Sender<Log>| {
             loop {
                 sleep(Duration::from_mins(30)).await;
                 if !client.has_auth() {
                     let _ = client.refresh_listen_key().await;
+                    let _ = logs_sender
+                        .send(Log::new(LogLevel::Info, "Refreshed listen key".to_string()));
                 }
             }
         };
@@ -94,7 +89,7 @@ impl Exchange for BinanceFuturesExchange {
                         order_flow_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error(true, "CONN".to_string()), format!("{:?}", e))).ok();
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
@@ -103,7 +98,7 @@ impl Exchange for BinanceFuturesExchange {
                         open_interest_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error(true, "CONN".to_string()), format!("{:?}", e))).ok();
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
@@ -114,11 +109,11 @@ impl Exchange for BinanceFuturesExchange {
                         orders_sender_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error(true, "CONN".to_string()), format!("{:?}", e))).ok();
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
 
-                    _ = keep_listen_key_alive(&client_clone) => {}
+                    _ = keep_listen_key_alive(&client_clone, &logs_sender_clone) => {}
 
                     _ = shutdown_rx => {
                         logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string())).ok();
@@ -140,8 +135,6 @@ impl Exchange for BinanceFuturesExchange {
                 open_interest: shared_open_interest_state,
                 order_flow: shared_order_flow_state,
             },
-            orders_receiver,
-            logs_receiver,
         ))
     }
 
@@ -181,25 +174,21 @@ impl Exchange for BinanceFuturesExchange {
     }
 
     fn place_order(&self, new_order: NewOrder) -> () {
-        if let Some(orders_sender) = &self.orders_sender {
-            let client = self.client.clone();
-            let sender_clone = orders_sender.clone();
-            thread::spawn(move || {
-                let order = client.place_order_sync(new_order).unwrap();
-                sender_clone.send(order).unwrap();
-            });
-        }
+        let client = self.client.clone();
+        let sender_clone = self.orders_sender.clone();
+        thread::spawn(move || {
+            let order = client.place_order_sync(new_order).unwrap();
+            sender_clone.send(order).unwrap();
+        });
     }
 
     fn cancel_order(&self, order_id: String) -> () {
-        if let Some(orders_sender) = &self.orders_sender {
-            let client = self.client.clone();
-            let sender_clone = orders_sender.clone();
-            thread::spawn(move || {
-                let order = client.cancel_order_sync(&order_id).unwrap();
-                sender_clone.send(order).unwrap();
-            });
-        }
+        let client = self.client.clone();
+        let sender_clone = self.orders_sender.clone();
+        thread::spawn(move || {
+            let order = client.cancel_order_sync(&order_id).unwrap();
+            sender_clone.send(order).unwrap();
+        });
     }
 }
 
@@ -208,6 +197,8 @@ impl BinanceFuturesExchange {
         symbol: String,
         interval: Interval,
         candles_limit: usize,
+        orders_sender: Sender<Order>,
+        logs_sender: Sender<Log>,
         access_key: Option<String>,
         secret_key: Option<String>,
     ) -> Self {
@@ -222,8 +213,8 @@ impl BinanceFuturesExchange {
             symbol,
             interval,
             candles_limit,
-            logs_sender: None,
-            orders_sender: None,
+            logs_sender,
+            orders_sender,
             shared_candles_state: None,
             client,
             stop_tx: None,

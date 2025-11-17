@@ -1,12 +1,9 @@
-use crate::models::{Interval, Log, NewOrder, Order, SharedState, Symbol};
-use std::sync::mpsc::Receiver;
+use crate::models::{Interval, NewOrder, SharedState, Symbol};
 
 pub trait Exchange: Send + Sync {
     fn name(&self) -> &str;
 
-    fn start(
-        &mut self,
-    ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>;
+    fn start(&mut self) -> Result<(Symbol, SharedState), Box<dyn std::error::Error>>;
 
     fn stop(&mut self) -> ();
 
