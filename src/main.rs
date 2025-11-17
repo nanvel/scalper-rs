@@ -47,7 +47,7 @@ fn main() {
     let mut window_height = config.window_height;
 
     let mut window = Window::new(
-        &format!("Scalper - {}", symbol.slug),
+        &format!("{} - {}", symbol.slug, exchange.name()),
         window_width,
         window_height,
         WindowOptions {

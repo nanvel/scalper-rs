@@ -19,8 +19,6 @@ pub struct BinanceFuturesExchange {
     symbol: String,
     interval: Interval,
     candles_limit: usize,
-    access_key: Option<String>,
-    secret_key: Option<String>,
     logs_sender: Option<Sender<Log>>,
     orders_sender: Option<Sender<Order>>,
     shared_candles_state: Option<SharedCandlesState>,
@@ -30,10 +28,16 @@ pub struct BinanceFuturesExchange {
 }
 
 impl Exchange for BinanceFuturesExchange {
+    fn name(&self) -> &str {
+        self.name
+    }
+
     fn start(
         &mut self,
     ) -> Result<(Symbol, SharedState, Receiver<Order>, Receiver<Log>), Box<dyn std::error::Error>>
     {
+        let symbol = self.client.get_symbol_sync()?;
+
         let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(
             self.candles_limit,
             self.interval.clone(),
@@ -48,12 +52,6 @@ impl Exchange for BinanceFuturesExchange {
         self.orders_sender = Some(orders_sender);
         self.shared_candles_state = Some(shared_candles_state.clone());
 
-        let symbol = self.client.get_symbol_sync()?;
-
-        self.set_interval(self.interval.clone());
-
-        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
-
         let symbol_clone = self.symbol.clone();
         let candles_clone = shared_candles_state.clone();
         let order_book_clone = shared_order_book_state.clone();
@@ -65,6 +63,8 @@ impl Exchange for BinanceFuturesExchange {
 
         let client_clone = self.client.clone();
 
+        self.set_interval(self.interval);
+
         let keep_listen_key_alive = async |client: &BinanceClient| {
             loop {
                 sleep(Duration::from_mins(30)).await;
@@ -73,6 +73,8 @@ impl Exchange for BinanceFuturesExchange {
                 }
             }
         };
+
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let handle = thread::spawn(move || {
             let rt = runtime::Builder::new_multi_thread()
@@ -220,8 +222,6 @@ impl BinanceFuturesExchange {
             symbol,
             interval,
             candles_limit,
-            access_key,
-            secret_key,
             logs_sender: None,
             orders_sender: None,
             shared_candles_state: None,

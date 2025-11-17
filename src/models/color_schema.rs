@@ -80,8 +80,8 @@ impl ColorSchema {
             scale_bar: Color::new(139, 92, 246, 255),  // #8B5CF6
 
             // status
-            status_ok: Color::new(52, 211, 153, 255), // #34D399,
-            status_warning: Color::new(251, 146, 60, 255), // #FB923C,
+            status_ok: Color::new(16, 185, 129, 255), // #10B981
+            status_warning: Color::new(251, 146, 60, 255), // #FB923C
             status_critical: Color::new(248, 113, 113, 255), // #F87171
         }
     }
