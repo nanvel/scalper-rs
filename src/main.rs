@@ -10,7 +10,7 @@ use graphics::{
 };
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
-    ColorSchema, Config, Interval, Layout, LogManager, OrderSide, OrderType, PxPerTick, Sizes,
+    ColorSchema, Config, Interval, Layout, LogManager, Lot, OrderSide, OrderType, PxPerTick,
 };
 use raqote::DrawTarget;
 use rust_decimal::Decimal;
@@ -62,11 +62,15 @@ fn main() {
     .unwrap();
 
     let mut size_range = Decimal::ZERO;
-    let mut sizes = Sizes::new([
-        config.size_1.unwrap(),
-        config.size_2.unwrap(),
-        config.size_3.unwrap(),
-    ]);
+    let mut lot = Lot::new(
+        config.lost_size.unwrap(),
+        [
+            config.lot_mult_1.unwrap(),
+            config.lot_mult_2.unwrap(),
+            config.lot_mult_3.unwrap(),
+            config.lot_mult_4.unwrap(),
+        ],
+    );
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -148,20 +152,24 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
-            sizes.select_size(0);
+            lot.select_size(0);
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
-            sizes.select_size(1);
+            lot.select_size(1);
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
-            sizes.select_size(2);
+            lot.select_size(2);
+        }
+
+        if window.is_key_pressed(Key::Key4, minifb::KeyRepeat::No) {
+            lot.select_size(3);
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
             if let Some(price) = bid {
-                let size_base = sizes.get_value(price, &symbol);
+                let size_base = lot.get_value(price, &symbol);
                 exchange.place_order(NewOrder {
                     order_type: OrderType::Market,
                     order_side: OrderSide::Buy,
@@ -173,7 +181,7 @@ fn main() {
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
             if let Some(price) = bid {
-                let size_base = sizes.get_value(price, &symbol);
+                let size_base = lot.get_value(price, &symbol);
                 exchange.place_order(NewOrder {
                     order_type: OrderType::Market,
                     order_side: OrderSide::Sell,
@@ -254,7 +262,7 @@ fn main() {
                         .floor()
                             * symbol.tick_size
                             + center_price;
-                        let size_base = sizes.get_value(price, &symbol);
+                        let size_base = lot.get_value(price, &symbol);
                         let order_type = if window.is_key_down(Key::LeftShift)
                             || window.is_key_down(Key::RightShift)
                         {
@@ -357,7 +365,7 @@ fn main() {
         }
         status_renderer.render(
             interval,
-            sizes.get_quote(),
+            &lot,
             &mut dt,
             &text_renderer,
             &color_schema,

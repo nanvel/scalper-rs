@@ -22,11 +22,15 @@ pub struct Config {
     pub binance_secret_key: Option<String>,
 
     #[serde(default = "default_size")]
-    pub size_1: Option<Decimal>,
-    #[serde(default = "default_size")]
-    pub size_2: Option<Decimal>,
-    #[serde(default = "default_size")]
-    pub size_3: Option<Decimal>,
+    pub lost_size: Option<Decimal>,
+    #[serde(default = "default_mult_1")]
+    pub lot_mult_1: Option<usize>,
+    #[serde(default = "default_mult_2")]
+    pub lot_mult_2: Option<usize>,
+    #[serde(default = "default_mult_3")]
+    pub lot_mult_3: Option<usize>,
+    #[serde(default = "default_mult_4")]
+    pub lot_mult_4: Option<usize>,
 
     pub sl_pnl: Option<Decimal>,
 }
@@ -41,6 +45,8 @@ struct Cli {
     #[arg(long)]
     theme: Option<String>,
     #[arg(long)]
+    lot_size: Option<Decimal>,
+    #[arg(long)]
     sl_pnl: Option<Decimal>,
 }
 
@@ -50,6 +56,22 @@ fn default_exchange() -> String {
 
 fn default_size() -> Option<Decimal> {
     Some(Decimal::from(100))
+}
+
+fn default_mult_1() -> Option<usize> {
+    Some(1)
+}
+
+fn default_mult_2() -> Option<usize> {
+    Some(2)
+}
+
+fn default_mult_3() -> Option<usize> {
+    Some(5)
+}
+
+fn default_mult_4() -> Option<usize> {
+    Some(10)
 }
 
 fn default_width() -> usize {
@@ -83,6 +105,9 @@ impl Config {
         config.symbol = cli_overrides.symbol.clone();
         if let Some(exchange) = cli_overrides.exchange {
             config.exchange = exchange;
+        }
+        if let Some(lot_size) = cli_overrides.lot_size {
+            config.lost_size = Some(lot_size);
         }
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);

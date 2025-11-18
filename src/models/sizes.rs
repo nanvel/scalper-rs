@@ -1,17 +1,19 @@
 use crate::models::Symbol;
 use rust_decimal::Decimal;
 
-pub struct Sizes {
-    quotes: [Decimal; 3],
-    values: Option<[Decimal; 3]>,
+pub struct Lot {
+    size: Decimal,
+    size_base: Option<Decimal>,
+    multipliers: [usize; 4],
     selected: usize,
 }
 
-impl Sizes {
-    pub fn new(quotes: [Decimal; 3]) -> Self {
-        Sizes {
-            quotes,
-            values: None,
+impl Lot {
+    pub fn new(size: Decimal, multipliers: [usize; 4]) -> Self {
+        Lot {
+            size,
+            size_base: None,
+            multipliers,
             selected: 0,
         }
     }
@@ -20,22 +22,30 @@ impl Sizes {
         self.selected = index;
     }
 
+    pub fn get_size(&self) -> Decimal {
+        self.size
+    }
+
+    pub fn get_size_base(&self) -> Option<Decimal> {
+        self.size_base
+    }
+
+    pub fn get_multiplier(&self) -> usize {
+        self.multipliers[self.selected]
+    }
+
     pub fn get_quote(&self) -> Decimal {
-        self.quotes[self.selected]
+        self.size * Decimal::from(self.multipliers[self.selected])
     }
 
     pub fn get_value(&mut self, price: Decimal, symbol: &Symbol) -> Decimal {
-        if let Some(v) = &self.values {
-            return v[self.selected];
+        if let Some(size_base) = &self.size_base {
+            return size_base * Decimal::from(self.multipliers[self.selected]);
         }
 
-        let mut arr = [Decimal::ZERO; 3];
-        for (i, q) in self.quotes.iter().enumerate() {
-            arr[i] = symbol.tune_quantity(q / price, price);
-        }
+        let size = symbol.tune_quantity(self.size / price, price);
+        self.size_base = Some(size);
 
-        let selected_value = arr[self.selected];
-        self.values = Some(arr);
-        selected_value
+        size * Decimal::from(self.multipliers[self.selected])
     }
 }
