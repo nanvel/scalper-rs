@@ -28,7 +28,7 @@ pub struct NewOrder {
     pub price: Option<Decimal>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Order {
     pub id: String,
     pub order_type: OrderType,

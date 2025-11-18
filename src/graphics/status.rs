@@ -1,5 +1,5 @@
 use super::text::TextRenderer;
-use crate::models::{Area, ColorSchema, Interval, Orders, Status};
+use crate::models::{Area, ColorSchema, Interval, Lot, Orders, Status};
 use chrono::Utc;
 use f64_fixed::to_fixed_string;
 use raqote::{DrawOptions, DrawTarget, Source};
@@ -19,7 +19,7 @@ impl StatusRenderer {
     pub fn render(
         &self,
         interval: Interval,
-        size: Decimal,
+        lot: &Lot,
         dt: &mut DrawTarget,
         text_renderer: &TextRenderer,
         color_schema: &ColorSchema,
@@ -66,14 +66,24 @@ impl StatusRenderer {
         );
 
         let now = Utc::now();
+        let lots = if let Some(size_base) = lot.get_size_base() {
+            (orders.base_balance() / size_base)
+                .round()
+                .to_f64()
+                .unwrap()
+        } else {
+            0_f64
+        };
+
         let left_text = format!(
-            "{} <{}> {}L {}S {} {}",
+            "{} <{} x {}> {}L {}S {} {}",
             interval.slug(),
-            size.to_string(),
+            lot.get_size().to_string(),
+            lot.get_multiplier().to_string(),
             orders.open_limit().to_string(),
             orders.open_stop().to_string(),
             now.format("%H:%M:%S").to_string(),
-            to_fixed_string(orders.base_balance().to_f64().unwrap(), 10),
+            to_fixed_string(lots, 6),
         );
         text_renderer.draw(
             dt,

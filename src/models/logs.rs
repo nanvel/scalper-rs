@@ -51,6 +51,33 @@ impl LogManager {
         }
     }
 
+    pub fn log_info(&self, message: &str) {
+        let _ = self.term.write_line(&format!(
+            "{} {} {}",
+            style("[INFO]").green(),
+            Timestamp::now().to_utc_string(),
+            message
+        ));
+    }
+
+    pub fn log_warning(&self, message: &str) {
+        let _ = self.term.write_line(&format!(
+            "{} {} {}",
+            style("[WARNING]").yellow(),
+            Timestamp::now().to_utc_string(),
+            message
+        ));
+    }
+
+    pub fn log_error(&self, message: &str) {
+        let _ = self.term.write_line(&format!(
+            "{} {} {}",
+            style("[ERROR]").red(),
+            Timestamp::now().to_utc_string(),
+            message
+        ));
+    }
+
     pub fn status(&mut self) -> Status {
         if let Status::Critical(message) = &self.status {
             return self.status.clone();
@@ -65,25 +92,15 @@ impl LogManager {
         Status::Ok
     }
 
-    pub fn update(&mut self) {
+    pub fn consume(&mut self) {
         while let Ok(alert) = self.receiver.try_recv() {
             match alert.level {
                 LogLevel::Info => {
-                    let _ = self.term.write_line(&format!(
-                        "{} {} {}",
-                        style("[INFO]").green(),
-                        alert.created_at.to_utc_string(),
-                        alert.message
-                    ));
+                    self.log_info(&alert.message);
                 }
                 LogLevel::Warning(message, show_for) => {
                     let show_for = show_for.unwrap_or(2);
-                    let _ = self.term.write_line(&format!(
-                        "{} {} {}",
-                        style("[WARNING]").yellow(),
-                        alert.created_at.to_utc_string(),
-                        alert.message
-                    ));
+                    self.log_warning(&message);
                     let until_ts = if let Some((_, ts)) = self.warnings_queue.front() {
                         Timestamp::from_seconds(ts.seconds() + show_for as u64)
                     } else {
@@ -92,12 +109,7 @@ impl LogManager {
                     self.warnings_queue.push_front((message, until_ts));
                 }
                 LogLevel::Error(message) => {
-                    let _ = self.term.write_line(&format!(
-                        "{} {} {}",
-                        style("[ERROR]").red(),
-                        alert.created_at.to_utc_string(),
-                        alert.message
-                    ));
+                    self.log_error(&message);
                     self.status = Status::Critical(message);
                 }
             }
