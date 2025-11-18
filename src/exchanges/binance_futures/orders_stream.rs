@@ -82,6 +82,15 @@ pub async fn start_orders_stream(
 }
 
 fn process_filled_order(er: &ExecutionReport, orders_sender: &Sender<Order>) {
+    if let Some(t) = &er.order_type {
+        if let Some(s) = &er.current_order_status {
+            if t.eq("STOP_MARKET") && s.eq("EXPIRED") {
+                // STOP_MARKET -> MARKET
+                return;
+            }
+        }
+    }
+
     let order_side = match &er.side {
         Some(s) if s.eq("BUY") => OrderSide::Buy,
         Some(s) if s.eq("SELL") => OrderSide::Sell,
@@ -101,6 +110,15 @@ fn process_filled_order(er: &ExecutionReport, orders_sender: &Sender<Order>) {
         _ => OrderStatus::Filled,
     };
 
+    let price = match order_status {
+        OrderStatus::Filled => er.avg_price.unwrap(),
+        OrderStatus::Pending => match order_type {
+            OrderType::Stop => er.stop_price.unwrap(),
+            OrderType::Limit => er.price.unwrap(),
+            OrderType::Market => Decimal::from(0),
+        },
+    };
+
     let rate = match order_type {
         OrderType::Limit => Decimal::from_str("0.0002").unwrap(),
         _ => Decimal::from_str("0.0005").unwrap(),
@@ -115,7 +133,7 @@ fn process_filled_order(er: &ExecutionReport, orders_sender: &Sender<Order>) {
             order_status,
             er.orig_qty.unwrap(),
             er.accumulated_executed_qty.unwrap(),
-            er.price.unwrap(),
+            price,
             er.avg_price.unwrap(),
             commission,
             Timestamp::from_milliseconds(er.trade_time.unwrap()),
@@ -156,4 +174,6 @@ pub struct ExecutionReport {
     pub trade_time: Option<u64>,
     #[serde(rename = "ap")]
     pub avg_price: Option<Decimal>,
+    #[serde(rename = "sp")]
+    pub stop_price: Option<Decimal>,
 }
