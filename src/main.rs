@@ -23,7 +23,7 @@ fn main() {
     let mut logs_manager = LogManager::new(logs_receiver, Term::stdout());
 
     let config = Config::load().unwrap_or_else(|err| {
-        eprintln!("Error loading config: {}", err);
+        logs_manager.log_error(&format!("Error loading config: {}", err));
         std::process::exit(1);
     });
 
@@ -38,12 +38,12 @@ fn main() {
         orders_sender,
     )
     .unwrap_or_else(|err| {
-        eprintln!("Error creating exchange: {}", err);
+        logs_manager.log_error(&format!("Error creating exchange: {}", err));
         std::process::exit(1);
     });
 
     let (symbol, shared_state) = exchange.start().unwrap_or_else(|err| {
-        eprintln!("Error starting streams: {}", err);
+        logs_manager.log_error(&format!("Error starting streams: {}", err));
         std::process::exit(1);
     });
 
@@ -107,7 +107,7 @@ fn main() {
             ask = order_book.ask();
         }
 
-        logs_manager.update();
+        logs_manager.consume();
 
         // pause recenter if ctrl is pressed
         if !(center.is_some()
