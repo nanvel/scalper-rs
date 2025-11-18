@@ -351,6 +351,7 @@ impl CandlesRenderer {
         );
 
         // orders
+        let mut last_filler_order: Option<Order> = None;
         for order in orders {
             let color = match order.order_side {
                 OrderSide::Buy => color_schema.volume_buy,
@@ -358,21 +359,13 @@ impl CandlesRenderer {
             };
 
             if order.is_filled() {
-                // solid triangle
-                let y = price_to_y(order.average_price);
-                let mut pb = PathBuilder::new();
-                pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
-                pb.line_to(
-                    ((self.area.left + self.area.width) - 10) as f32,
-                    (y - 4) as f32,
-                );
-                pb.line_to(
-                    ((self.area.left + self.area.width) - 10) as f32,
-                    (y + 4) as f32,
-                );
-                pb.close();
-                let path = pb.finish();
-                dt.fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
+                if let Some(last_o) = &last_filler_order {
+                    if order.timestamp > last_o.timestamp {
+                        last_filler_order = Some(order.clone());
+                    }
+                } else {
+                    last_filler_order = Some(order.clone());
+                }
             } else {
                 let y = price_to_y(order.price);
                 let mut pb = PathBuilder::new();
@@ -398,6 +391,29 @@ impl CandlesRenderer {
                     &DrawOptions::new(),
                 );
             }
+        }
+
+        if let Some(order) = last_filler_order {
+            // solid triangle
+            let color = match order.order_side {
+                OrderSide::Buy => color_schema.volume_buy,
+                OrderSide::Sell => color_schema.volume_sell,
+            };
+
+            let y = price_to_y(order.average_price);
+            let mut pb = PathBuilder::new();
+            pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
+            pb.line_to(
+                ((self.area.left + self.area.width) - 10) as f32,
+                (y - 4) as f32,
+            );
+            pb.line_to(
+                ((self.area.left + self.area.width) - 10) as f32,
+                (y + 4) as f32,
+            );
+            pb.close();
+            let path = pb.finish();
+            dt.fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
         }
     }
 }
