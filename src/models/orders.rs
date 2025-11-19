@@ -1,4 +1,4 @@
-use crate::models::{BidAsk, Timestamp};
+use crate::models::Timestamp;
 use rust_decimal::Decimal;
 
 #[derive(Debug, Clone)]
@@ -118,8 +118,8 @@ impl Orders {
         total
     }
 
-    pub fn pnl(&self, bid_ask: &BidAsk) -> Decimal {
-        if !bid_ask.is_some() {
+    pub fn pnl(&self, bid: Option<Decimal>, ask: Option<Decimal>) -> Decimal {
+        if !bid.is_some() || !ask.is_some() {
             return Decimal::ZERO;
         }
 
@@ -139,9 +139,9 @@ impl Orders {
             }
         }
         if base_balance > Decimal::ZERO {
-            received += bid_ask.bid.unwrap() * base_balance;
+            received += bid.unwrap() * base_balance;
         } else if base_balance < Decimal::ZERO {
-            spent += bid_ask.ask.unwrap() * -base_balance;
+            spent += ask.unwrap() * -base_balance;
         }
 
         received - spent
@@ -161,6 +161,15 @@ impl Orders {
             .iter()
             .filter(|o| o.order_status == OrderStatus::Pending)
             .collect()
+    }
+
+    pub fn last_closed(&self) -> Option<&Order> {
+        self.orders
+            .iter()
+            .filter(|o| {
+                o.order_status == OrderStatus::Filled && o.executed_quantity > Decimal::ZERO
+            })
+            .max_by_key(|o| o.timestamp)
     }
 
     pub fn open_limit(&self) -> usize {

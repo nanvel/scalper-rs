@@ -4,15 +4,14 @@ mod models;
 mod trader;
 
 use crate::exchanges::ExchangeFactory;
-use crate::models::{NewOrder, Orders};
+use crate::models::Orders;
+use crate::trader::Trader;
 use console::Term;
 use graphics::{
     CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
 };
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{
-    BidAsk, ColorSchema, Config, Interval, Layout, LogManager, Lot, OrderSide, OrderType, PxPerTick,
-};
+use models::{ColorSchema, Config, Interval, Layout, LogManager, Lot, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::Decimal;
 use std::sync::mpsc;
@@ -49,7 +48,7 @@ fn main() {
     });
 
     let mut size_range = Decimal::ZERO;
-    let mut lot = Lot::new(
+    let lot = Lot::new(
         config.lost_size.unwrap(),
         [
             config.lot_mult_1.unwrap(),
@@ -58,8 +57,6 @@ fn main() {
             config.lot_mult_4.unwrap(),
         ],
     );
-
-    let mut bid_ask = BidAsk::default();
 
     let mut window_width = config.window_width;
     let mut window_height = config.window_height;
@@ -88,7 +85,7 @@ fn main() {
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
-    let mut orders = Orders::new();
+    let mut trader = Trader::new(&mut exchange, symbol.clone(), Orders::new(), lot);
 
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
@@ -98,7 +95,7 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
-                orders.consume(value);
+                trader.consume_order(value);
                 force_redraw = true;
             }
             Err(mpsc::TryRecvError::Empty) => {}
@@ -107,7 +104,7 @@ fn main() {
 
         {
             let order_book = shared_state.order_book.read().unwrap();
-            bid_ask.update(order_book.bid(), order_book.ask());
+            trader.update_bid_ask(order_book.bid(), order_book.ask());
         }
 
         logs_manager.consume();
@@ -116,9 +113,9 @@ fn main() {
         if !(center.is_some()
             && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl)))
         {
-            if bid_ask.is_some() {
+            if trader.bid.is_some() && trader.ask.is_some() {
                 let current_center = Some(
-                    ((bid_ask.bid.unwrap() + bid_ask.ask.unwrap())
+                    ((trader.bid.unwrap() + trader.ask.unwrap())
                         / Decimal::from(2)
                         / symbol.tick_size)
                         .floor()
@@ -154,64 +151,35 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
-            lot.select_size(0);
+            trader.select_size(0);
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
-            lot.select_size(1);
+            trader.select_size(1);
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
-            lot.select_size(2);
+            trader.select_size(2);
         }
 
         if window.is_key_pressed(Key::Key4, minifb::KeyRepeat::No) {
-            lot.select_size(3);
+            trader.select_size(3);
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
-            if let Some(price) = bid_ask.bid {
-                let size_base = lot.get_value(price, &symbol);
-                exchange.place_order(NewOrder {
-                    order_type: OrderType::Market,
-                    order_side: OrderSide::Buy,
-                    quantity: size_base,
-                    price: None,
-                });
-            }
+            trader.place_market_buy();
         }
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
-            if let Some(price) = bid_ask.ask {
-                let size_base = lot.get_value(price, &symbol);
-                exchange.place_order(NewOrder {
-                    order_type: OrderType::Market,
-                    order_side: OrderSide::Sell,
-                    quantity: size_base,
-                    price: None,
-                });
-            }
+            trader.place_market_sell();
         }
 
         if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
-            let balance = orders.base_balance();
-            if balance != Decimal::ZERO {
-                if balance > Decimal::ZERO {
-                    exchange.place_order(NewOrder {
-                        order_type: OrderType::Market,
-                        order_side: OrderSide::Sell,
-                        quantity: balance,
-                        price: None,
-                    });
-                } else {
-                    exchange.place_order(NewOrder {
-                        order_type: OrderType::Market,
-                        order_side: OrderSide::Buy,
-                        quantity: -balance,
-                        price: None,
-                    });
-                }
-            }
+            trader.flat();
+        }
+
+        if window.is_key_pressed(Key::R, minifb::KeyRepeat::No) {
+            trader.reverse();
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -236,7 +204,7 @@ fn main() {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
-                exchange.set_interval(new_interval);
+                trader.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -248,7 +216,7 @@ fn main() {
             let new_interval = interval.down();
             if new_interval != interval {
                 interval = new_interval;
-                exchange.set_interval(new_interval);
+                trader.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -264,33 +232,12 @@ fn main() {
                         .floor()
                             * symbol.tick_size
                             + center_price;
-                        let size_base = lot.get_value(price, &symbol);
-                        let order_type = if window.is_key_down(Key::LeftShift)
-                            || window.is_key_down(Key::RightShift)
+                        if window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift)
                         {
-                            OrderType::Stop
+                            trader.place_stop(price);
                         } else {
-                            OrderType::Limit
+                            trader.place_limit(price);
                         };
-                        let order_side = if price < bid_ask.bid.unwrap() {
-                            if order_type == OrderType::Limit {
-                                OrderSide::Buy
-                            } else {
-                                OrderSide::Sell
-                            }
-                        } else {
-                            if order_type == OrderType::Limit {
-                                OrderSide::Sell
-                            } else {
-                                OrderSide::Buy
-                            }
-                        };
-                        exchange.place_order(NewOrder {
-                            order_type,
-                            order_side,
-                            quantity: size_base,
-                            price: Some(price),
-                        });
                     }
                 }
             }
@@ -298,33 +245,14 @@ fn main() {
         left_was_pressed = left_pressed;
 
         if window.is_key_pressed(Key::C, minifb::KeyRepeat::No) {
-            for o in orders.open() {
-                exchange.cancel_order(o.id.clone());
-            }
+            trader.cancel_all()
         }
 
-        if bid_ask.is_some() && !sl_triggered {
+        if trader.bid.is_some() && !sl_triggered {
             if let Some(sl_pnl) = config.sl_pnl {
-                if orders.pnl(&bid_ask) < -sl_pnl.abs() {
+                if trader.get_pnl() < -sl_pnl.abs() {
                     sl_triggered = true;
-                    let balance = orders.base_balance();
-                    if balance != Decimal::ZERO {
-                        if balance > Decimal::ZERO {
-                            exchange.place_order(NewOrder {
-                                order_type: OrderType::Market,
-                                order_side: OrderSide::Sell,
-                                quantity: balance,
-                                price: None,
-                            });
-                        } else {
-                            exchange.place_order(NewOrder {
-                                order_type: OrderType::Market,
-                                order_side: OrderSide::Buy,
-                                quantity: -balance,
-                                price: None,
-                            });
-                        }
-                    }
+                    trader.flat();
                 }
             }
         }
@@ -341,7 +269,8 @@ fn main() {
                 symbol.tick_size,
                 center_price,
                 px_per_tick.get(),
-                orders.all(),
+                trader.get_open_orders(),
+                trader.get_last_closed_order(),
                 force_redraw,
             );
             order_book_renderer.render(
@@ -367,12 +296,10 @@ fn main() {
         }
         status_renderer.render(
             interval,
-            &lot,
             &mut dt,
             &text_renderer,
             &color_schema,
-            &orders,
-            &bid_ask,
+            &trader,
             &logs_manager.status(),
         );
 

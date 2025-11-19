@@ -1,38 +1,36 @@
 use crate::exchanges::Exchange;
-use crate::models::{BidAsk, Log, Lot, NewOrder, Order, OrderSide, OrderType, Orders, Symbol};
+use crate::models::{Interval, Lot, NewOrder, Order, OrderSide, OrderType, Orders, Symbol};
 use rust_decimal::Decimal;
-use std::sync::mpsc::Sender;
+use rust_decimal::prelude::ToPrimitive;
 
 pub struct Trader<'a> {
-    exchange: &'a dyn Exchange,
+    exchange: &'a mut Box<dyn Exchange>,
     symbol: Symbol,
     orders: Orders,
     lot: Lot,
-    bid_ask: &'a BidAsk,
-    logs_sender: Sender<Log>,
+    pub bid: Option<Decimal>,
+    pub ask: Option<Decimal>,
 }
 
 impl<'a> Trader<'a> {
     pub fn new(
-        exchange: &'a dyn Exchange,
+        exchange: &'a mut Box<dyn Exchange>,
         symbol: Symbol,
         orders: Orders,
         lot: Lot,
-        bid_ask: &'a BidAsk,
-        logs_sender: Sender<Log>,
     ) -> Self {
         Trader {
             exchange,
             symbol,
             orders,
             lot,
-            bid_ask,
-            logs_sender,
+            bid: None,
+            ask: None,
         }
     }
 
-    pub fn buy_market(&mut self) {
-        if let Some(ask) = self.bid_ask.ask {
+    pub fn place_market_buy(&mut self) {
+        if let Some(ask) = self.ask {
             let size = self.lot.get_value(ask, &self.symbol);
             self.exchange.place_order(NewOrder {
                 order_type: OrderType::Market,
@@ -43,8 +41,8 @@ impl<'a> Trader<'a> {
         }
     }
 
-    pub fn sell_market(&mut self) {
-        if let Some(bid) = self.bid_ask.bid {
+    pub fn place_market_sell(&mut self) {
+        if let Some(bid) = self.bid {
             let size = self.lot.get_value(bid, &self.symbol);
             self.exchange.place_order(NewOrder {
                 order_type: OrderType::Market,
@@ -55,47 +53,139 @@ impl<'a> Trader<'a> {
         }
     }
 
-    pub fn buy_limit(&mut self, price: Decimal) {
-        let size = self.lot.get_value(price, &self.symbol);
-        self.exchange.place_order(NewOrder {
-            order_type: OrderType::Limit,
-            order_side: OrderSide::Buy,
-            quantity: size,
-            price: Some(price),
-        });
+    pub fn place_limit(&mut self, price: Decimal) {
+        if let Some(bid) = self.bid {
+            let size = self.lot.get_value(price, &self.symbol);
+            self.exchange.place_order(NewOrder {
+                order_type: OrderType::Limit,
+                order_side: if price < bid {
+                    OrderSide::Buy
+                } else {
+                    OrderSide::Sell
+                },
+                quantity: size,
+                price: Some(price),
+            });
+        }
     }
 
-    pub fn sell_limit(&mut self, price: Decimal) {
-        let size = self.lot.get_value(price, &self.symbol);
-        self.exchange.place_order(NewOrder {
-            order_type: OrderType::Limit,
-            order_side: OrderSide::Sell,
-            quantity: size,
-            price: Some(price),
-        });
+    pub fn place_stop(&mut self, price: Decimal) {
+        if let Some(bid) = self.bid {
+            let size = self.lot.get_value(price, &self.symbol);
+            self.exchange.place_order(NewOrder {
+                order_type: OrderType::Stop,
+                order_side: if price < bid {
+                    OrderSide::Sell
+                } else {
+                    OrderSide::Buy
+                },
+                quantity: size,
+                price: Some(price),
+            });
+        }
     }
 
-    pub fn buy_stop(&mut self, price: Decimal) {
-        let size = self.lot.get_value(price, &self.symbol);
-        self.exchange.place_order(NewOrder {
-            order_type: OrderType::Stop,
-            order_side: OrderSide::Buy,
-            quantity: size,
-            price: Some(price),
-        });
+    pub fn flat(&self) {
+        let balance = self.orders.base_balance();
+        if balance != Decimal::ZERO {
+            if balance > Decimal::ZERO {
+                self.exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Sell,
+                    quantity: balance,
+                    price: None,
+                });
+            } else {
+                self.exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Buy,
+                    quantity: -balance,
+                    price: None,
+                });
+            }
+        }
     }
 
-    pub fn sell_stop(&mut self, price: Decimal) {
-        let size = self.lot.get_value(price, &self.symbol);
-        self.exchange.place_order(NewOrder {
-            order_type: OrderType::Stop,
-            order_side: OrderSide::Sell,
-            quantity: size,
-            price: Some(price),
-        });
+    pub fn reverse(&mut self) {
+        let balance = self.orders.base_balance();
+        if balance != Decimal::ZERO {
+            if balance > Decimal::ZERO {
+                self.exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Sell,
+                    quantity: balance * Decimal::from(2),
+                    price: None,
+                });
+            } else {
+                self.exchange.place_order(NewOrder {
+                    order_type: OrderType::Market,
+                    order_side: OrderSide::Buy,
+                    quantity: -balance * Decimal::from(2),
+                    price: None,
+                });
+            }
+        }
+    }
+
+    pub fn cancel_all(&self) {
+        for o in self.orders.open() {
+            self.exchange.cancel_order(o.id.clone());
+        }
     }
 
     pub fn consume_order(&mut self, order: Order) {
         self.orders.consume(order);
+    }
+
+    pub fn get_pnl(&self) -> Decimal {
+        self.orders.pnl(self.bid, self.ask)
+    }
+
+    pub fn get_commission(&self) -> Decimal {
+        self.orders.commission()
+    }
+
+    pub fn get_open_orders(&self) -> Vec<&Order> {
+        self.orders.open()
+    }
+
+    pub fn get_last_closed_order(&self) -> Option<&Order> {
+        self.orders.last_closed()
+    }
+
+    pub fn get_size(&self) -> Decimal {
+        self.lot.get_size()
+    }
+
+    pub fn select_size(&mut self, index: usize) {
+        self.lot.select_size(index);
+    }
+
+    pub fn set_interval(&mut self, interval: Interval) {
+        self.exchange.set_interval(interval);
+    }
+
+    pub fn get_lots(&self) -> f64 {
+        if let Some(size_base) = self.lot.get_size_base() {
+            (self.orders.base_balance() / size_base)
+                .round()
+                .to_f64()
+                .unwrap()
+        } else {
+            0_f64
+        }
+    }
+
+    pub fn get_multiplier(&self) -> usize {
+        self.lot.get_multiplier()
+    }
+
+    pub fn update_bid_ask(&mut self, bid: Option<Decimal>, ask: Option<Decimal>) {
+        if bid.is_some() {
+            self.bid = bid;
+        }
+        if ask.is_some() {
+            self.ask = ask;
+        }
     }
 }
