@@ -1,6 +1,7 @@
 mod exchanges;
 mod graphics;
 mod models;
+mod trader;
 
 use crate::exchanges::ExchangeFactory;
 use crate::models::{NewOrder, Orders};
@@ -10,7 +11,7 @@ use graphics::{
 };
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{
-    ColorSchema, Config, Interval, Layout, LogManager, Lot, OrderSide, OrderType, PxPerTick,
+    BidAsk, ColorSchema, Config, Interval, Layout, LogManager, Lot, OrderSide, OrderType, PxPerTick,
 };
 use raqote::DrawTarget;
 use rust_decimal::Decimal;
@@ -47,6 +48,19 @@ fn main() {
         std::process::exit(1);
     });
 
+    let mut size_range = Decimal::ZERO;
+    let mut lot = Lot::new(
+        config.lost_size.unwrap(),
+        [
+            config.lot_mult_1.unwrap(),
+            config.lot_mult_2.unwrap(),
+            config.lot_mult_3.unwrap(),
+            config.lot_mult_4.unwrap(),
+        ],
+    );
+
+    let mut bid_ask = BidAsk::default();
+
     let mut window_width = config.window_width;
     let mut window_height = config.window_height;
 
@@ -60,17 +74,7 @@ fn main() {
         },
     )
     .unwrap();
-
-    let mut size_range = Decimal::ZERO;
-    let mut lot = Lot::new(
-        config.lost_size.unwrap(),
-        [
-            config.lot_mult_1.unwrap(),
-            config.lot_mult_2.unwrap(),
-            config.lot_mult_3.unwrap(),
-            config.lot_mult_4.unwrap(),
-        ],
-    );
+    window.set_target_fps(60);
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
@@ -86,19 +90,15 @@ fn main() {
 
     let mut orders = Orders::new();
 
-    window.set_target_fps(60);
-
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
     let mut force_redraw = true;
     let mut left_was_pressed = false;
-    let mut bid: Option<Decimal> = None;
-    let mut ask: Option<Decimal> = None;
     let mut sl_triggered = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
-                orders.on_order(value);
+                orders.consume(value);
                 force_redraw = true;
             }
             Err(mpsc::TryRecvError::Empty) => {}
@@ -107,8 +107,7 @@ fn main() {
 
         {
             let order_book = shared_state.order_book.read().unwrap();
-            bid = order_book.bid();
-            ask = order_book.ask();
+            bid_ask.update(order_book.bid(), order_book.ask());
         }
 
         logs_manager.consume();
@@ -117,9 +116,12 @@ fn main() {
         if !(center.is_some()
             && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl)))
         {
-            if bid.is_some() && ask.is_some() {
+            if bid_ask.is_some() {
                 let current_center = Some(
-                    ((bid.unwrap() + ask.unwrap()) / Decimal::from(2) / symbol.tick_size).floor()
+                    ((bid_ask.bid.unwrap() + bid_ask.ask.unwrap())
+                        / Decimal::from(2)
+                        / symbol.tick_size)
+                        .floor()
                         * symbol.tick_size,
                 );
 
@@ -168,7 +170,7 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
-            if let Some(price) = bid {
+            if let Some(price) = bid_ask.bid {
                 let size_base = lot.get_value(price, &symbol);
                 exchange.place_order(NewOrder {
                     order_type: OrderType::Market,
@@ -180,7 +182,7 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
-            if let Some(price) = bid {
+            if let Some(price) = bid_ask.ask {
                 let size_base = lot.get_value(price, &symbol);
                 exchange.place_order(NewOrder {
                     order_type: OrderType::Market,
@@ -270,7 +272,7 @@ fn main() {
                         } else {
                             OrderType::Limit
                         };
-                        let order_side = if price < bid.unwrap() {
+                        let order_side = if price < bid_ask.bid.unwrap() {
                             if order_type == OrderType::Limit {
                                 OrderSide::Buy
                             } else {
@@ -301,9 +303,9 @@ fn main() {
             }
         }
 
-        if bid.is_some() && !sl_triggered {
+        if bid_ask.is_some() && !sl_triggered {
             if let Some(sl_pnl) = config.sl_pnl {
-                if orders.pnl(bid, ask) < -sl_pnl.abs() {
+                if orders.pnl(&bid_ask) < -sl_pnl.abs() {
                     sl_triggered = true;
                     let balance = orders.base_balance();
                     if balance != Decimal::ZERO {
@@ -370,8 +372,7 @@ fn main() {
             &text_renderer,
             &color_schema,
             &orders,
-            &bid,
-            &ask,
+            &bid_ask,
             &logs_manager.status(),
         );
 

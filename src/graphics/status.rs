@@ -1,9 +1,8 @@
 use super::text::TextRenderer;
-use crate::models::{Area, ColorSchema, Interval, Lot, Orders, Status};
+use crate::models::{Area, BidAsk, ColorSchema, Interval, Lot, Orders, Status};
 use chrono::Utc;
 use f64_fixed::to_fixed_string;
 use raqote::{DrawOptions, DrawTarget, Source};
-use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 
 pub struct StatusRenderer {
@@ -24,8 +23,7 @@ impl StatusRenderer {
         text_renderer: &TextRenderer,
         color_schema: &ColorSchema,
         orders: &Orders,
-        bid: &Option<Decimal>,
-        ask: &Option<Decimal>,
+        bid_ask: &BidAsk,
         status: &Status,
     ) {
         dt.fill_rect(
@@ -96,7 +94,7 @@ impl StatusRenderer {
 
         text_renderer.draw(
             dt,
-            &to_fixed_string(orders.pnl(*bid, *ask).to_f64().unwrap(), 10),
+            &to_fixed_string(orders.pnl(bid_ask).to_f64().unwrap(), 10),
             self.area.left + self.area.width - 200,
             self.area.top + self.area.height / 2 + self.padding * 2,
             self.area.height - self.padding * 2,

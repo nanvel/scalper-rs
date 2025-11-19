@@ -1,4 +1,4 @@
-use crate::models::Timestamp;
+use crate::models::{BidAsk, Timestamp};
 use rust_decimal::Decimal;
 
 #[derive(Debug, Clone)]
@@ -86,7 +86,7 @@ impl Orders {
         Self { orders: Vec::new() }
     }
 
-    pub fn on_order(&mut self, order: Order) {
+    pub fn consume(&mut self, order: Order) {
         if let Some(pos) = self.orders.iter().position(|o| o.id == order.id) {
             if self.orders[pos].order_status == OrderStatus::Pending {
                 self.orders[pos] = order;
@@ -118,8 +118,8 @@ impl Orders {
         total
     }
 
-    pub fn pnl(&self, bid: Option<Decimal>, ask: Option<Decimal>) -> Decimal {
-        if !bid.is_some() && !ask.is_some() {
+    pub fn pnl(&self, bid_ask: &BidAsk) -> Decimal {
+        if !bid_ask.is_some() {
             return Decimal::ZERO;
         }
 
@@ -139,9 +139,9 @@ impl Orders {
             }
         }
         if base_balance > Decimal::ZERO {
-            received += bid.unwrap() * base_balance;
+            received += bid_ask.bid.unwrap() * base_balance;
         } else if base_balance < Decimal::ZERO {
-            spent += ask.unwrap() * -base_balance;
+            spent += bid_ask.ask.unwrap() * -base_balance;
         }
 
         received - spent
