@@ -106,7 +106,7 @@ impl<'a> Trader<'a> {
         }
     }
 
-    pub fn reverse(&mut self) {
+    pub fn reverse(&self) {
         let balance = self.orders.base_balance();
         if balance != Decimal::ZERO {
             if balance > Decimal::ZERO {
