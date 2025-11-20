@@ -35,7 +35,8 @@ impl CandlesRenderer {
         tick_size: Decimal,
         center: Decimal,
         px_per_tick: Decimal,
-        orders: Vec<&Order>,
+        open_orders: Vec<&Order>,
+        last_closed_order: Option<&Order>,
         force_redraw: bool,
     ) {
         if !force_redraw {
@@ -351,49 +352,38 @@ impl CandlesRenderer {
         );
 
         // orders
-        let mut last_filler_order: Option<Order> = None;
-        for order in orders {
+        for order in open_orders {
             let color = match order.order_side {
                 OrderSide::Buy => color_schema.volume_buy,
                 OrderSide::Sell => color_schema.volume_sell,
             };
 
-            if order.is_filled() {
-                if let Some(last_o) = &last_filler_order {
-                    if order.timestamp > last_o.timestamp {
-                        last_filler_order = Some(order.clone());
-                    }
-                } else {
-                    last_filler_order = Some(order.clone());
-                }
-            } else {
-                let y = price_to_y(order.price);
-                let mut pb = PathBuilder::new();
-                pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
-                pb.line_to(
-                    ((self.area.left + self.area.width) - 10) as f32,
-                    (y - 4) as f32,
-                );
-                pb.line_to(
-                    ((self.area.left + self.area.width) - 10) as f32,
-                    (y + 4) as f32,
-                );
-                pb.close();
-                let path = pb.finish();
-                let stroke_style = StrokeStyle {
-                    width: 1.0,
-                    ..Default::default()
-                };
-                dt.stroke(
-                    &path,
-                    &Source::Solid(color.into()),
-                    &stroke_style,
-                    &DrawOptions::new(),
-                );
-            }
+            let y = price_to_y(order.price);
+            let mut pb = PathBuilder::new();
+            pb.move_to((self.area.left + self.area.width - 3) as f32, y as f32);
+            pb.line_to(
+                ((self.area.left + self.area.width) - 10) as f32,
+                (y - 4) as f32,
+            );
+            pb.line_to(
+                ((self.area.left + self.area.width) - 10) as f32,
+                (y + 4) as f32,
+            );
+            pb.close();
+            let path = pb.finish();
+            let stroke_style = StrokeStyle {
+                width: 1.0,
+                ..Default::default()
+            };
+            dt.stroke(
+                &path,
+                &Source::Solid(color.into()),
+                &stroke_style,
+                &DrawOptions::new(),
+            );
         }
 
-        if let Some(order) = last_filler_order {
+        if let Some(order) = last_closed_order {
             // solid triangle
             let color = match order.order_side {
                 OrderSide::Buy => color_schema.volume_buy,

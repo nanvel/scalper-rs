@@ -86,7 +86,7 @@ impl Orders {
         Self { orders: Vec::new() }
     }
 
-    pub fn on_order(&mut self, order: Order) {
+    pub fn consume(&mut self, order: Order) {
         if let Some(pos) = self.orders.iter().position(|o| o.id == order.id) {
             if self.orders[pos].order_status == OrderStatus::Pending {
                 self.orders[pos] = order;
@@ -119,7 +119,7 @@ impl Orders {
     }
 
     pub fn pnl(&self, bid: Option<Decimal>, ask: Option<Decimal>) -> Decimal {
-        if !bid.is_some() && !ask.is_some() {
+        if !bid.is_some() || !ask.is_some() {
             return Decimal::ZERO;
         }
 
@@ -161,6 +161,15 @@ impl Orders {
             .iter()
             .filter(|o| o.order_status == OrderStatus::Pending)
             .collect()
+    }
+
+    pub fn last_closed(&self) -> Option<&Order> {
+        self.orders
+            .iter()
+            .filter(|o| {
+                o.order_status == OrderStatus::Filled && o.executed_quantity > Decimal::ZERO
+            })
+            .max_by_key(|o| o.timestamp)
     }
 
     pub fn open_limit(&self) -> usize {
