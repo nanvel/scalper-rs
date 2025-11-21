@@ -31,7 +31,6 @@ fn main() {
     let mut exchange = ExchangeFactory::create(
         config.exchange.as_str(),
         config.symbol.clone(),
-        interval,
         200,
         &config,
         logs_sender,
@@ -42,7 +41,7 @@ fn main() {
         std::process::exit(1);
     });
 
-    let (symbol, shared_state) = exchange.start().unwrap_or_else(|err| {
+    let (symbol, shared_state) = exchange.start(interval).unwrap_or_else(|err| {
         logs_manager.log_error(&format!("Error starting streams: {}", err));
         std::process::exit(1);
     });
@@ -85,7 +84,7 @@ fn main() {
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
-    let mut trader = Trader::new(&mut exchange, symbol.clone(), Orders::new(), lot);
+    let mut trader = Trader::new(&exchange, symbol.clone(), Orders::new(), lot);
 
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
@@ -204,7 +203,7 @@ fn main() {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
-                trader.set_interval(new_interval);
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -216,7 +215,7 @@ fn main() {
             let new_interval = interval.down();
             if new_interval != interval {
                 interval = new_interval;
-                trader.set_interval(new_interval);
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }

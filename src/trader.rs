@@ -4,7 +4,7 @@ use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 
 pub struct Trader<'a> {
-    exchange: &'a mut Box<dyn Exchange>,
+    exchange: &'a Box<dyn Exchange>,
     symbol: Symbol,
     orders: Orders,
     lot: Lot,
@@ -13,12 +13,7 @@ pub struct Trader<'a> {
 }
 
 impl<'a> Trader<'a> {
-    pub fn new(
-        exchange: &'a mut Box<dyn Exchange>,
-        symbol: Symbol,
-        orders: Orders,
-        lot: Lot,
-    ) -> Self {
+    pub fn new(exchange: &'a Box<dyn Exchange>, symbol: Symbol, orders: Orders, lot: Lot) -> Self {
         Trader {
             exchange,
             symbol,
@@ -159,10 +154,6 @@ impl<'a> Trader<'a> {
 
     pub fn select_size(&mut self, index: usize) {
         self.lot.select_size(index);
-    }
-
-    pub fn set_interval(&mut self, interval: Interval) {
-        self.exchange.set_interval(interval);
     }
 
     pub fn get_lots(&self) -> f64 {

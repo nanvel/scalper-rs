@@ -11,7 +11,6 @@ impl ExchangeFactory {
     pub fn create(
         name: &str,
         symbol: String,
-        interval: Interval,
         candles_limit: usize,
         config: &Config,
         logs_sender: Sender<Log>,
@@ -20,7 +19,6 @@ impl ExchangeFactory {
         match name {
             "binance_usd_futures" => Ok(Box::new(BinanceFuturesExchange::new(
                 symbol,
-                interval,
                 candles_limit,
                 orders_sender,
                 logs_sender,
