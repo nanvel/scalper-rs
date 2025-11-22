@@ -8,7 +8,8 @@ use crate::models::{Log, LogLevel, Orders};
 use crate::trader::Trader;
 use console::Term;
 use graphics::{
-    CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
+    CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, OrdersRenderer, StatusRenderer,
+    TextRenderer,
 };
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{ColorSchema, Config, Interval, Layout, LogManager, PxPerTick};
@@ -71,6 +72,7 @@ fn main() {
             std::process::exit(1);
         });
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
+    let mut orders_renderer = OrdersRenderer::new(layout.orders_area);
     let mut order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
@@ -144,6 +146,7 @@ fn main() {
             dt = DrawTarget::new(window_width as i32, window_height as i32);
             layout = Layout::new(window_width as i32, window_height as i32);
             candles_renderer = CandlesRenderer::new(layout.candles_area);
+            orders_renderer = OrdersRenderer::new(layout.orders_area);
             order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
             order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
             status_renderer = StatusRenderer::new(layout.status_area);
@@ -284,6 +287,15 @@ fn main() {
             candles_renderer.render(
                 shared_state.candles.read().unwrap(),
                 shared_state.open_interest.read().unwrap(),
+                &mut dt,
+                &color_schema,
+                symbol.tick_size,
+                center_price,
+                px_per_tick.get(),
+                force_redraw,
+            );
+            orders_renderer.render(
+                shared_state.candles.read().unwrap(),
                 &mut dt,
                 &text_renderer,
                 &color_schema,
