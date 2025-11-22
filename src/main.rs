@@ -84,7 +84,7 @@ fn main() {
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
-    let mut trader = Trader::new(&exchange, symbol.clone(), Orders::new(), lot);
+    let mut trader = Trader::new(symbol.clone(), Orders::new(), lot);
 
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
@@ -166,19 +166,27 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
-            trader.place_market_buy();
+            if let Some(new_order) = trader.market_buy() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
-            trader.place_market_sell();
+            if let Some(new_order) = trader.market_sell() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
-            trader.flat();
+            if let Some(new_order) = trader.flat() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::R, minifb::KeyRepeat::No) {
-            trader.reverse();
+            if let Some(new_order) = trader.reverse() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -233,9 +241,13 @@ fn main() {
                             + center_price;
                         if window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift)
                         {
-                            trader.place_stop(price);
+                            if let Some(new_order) = trader.limit(price) {
+                                exchange.place_order(new_order);
+                            }
                         } else {
-                            trader.place_limit(price);
+                            if let Some(new_order) = trader.stop(price) {
+                                exchange.place_order(new_order);
+                            }
                         };
                     }
                 }
@@ -244,7 +256,9 @@ fn main() {
         left_was_pressed = left_pressed;
 
         if window.is_key_pressed(Key::C, minifb::KeyRepeat::No) {
-            trader.cancel_all()
+            for o in trader.get_open_orders() {
+                exchange.cancel_order(o.id.clone());
+            }
         }
 
         if trader.bid.is_some() && !sl_triggered {
