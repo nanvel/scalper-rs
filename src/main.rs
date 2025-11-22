@@ -4,7 +4,7 @@ mod models;
 mod trader;
 
 use crate::exchanges::ExchangeFactory;
-use crate::models::Orders;
+use crate::models::{Log, LogLevel, Orders};
 use crate::trader::Trader;
 use console::Term;
 use graphics::{
@@ -33,7 +33,7 @@ fn main() {
         config.symbol.clone(),
         200,
         &config,
-        logs_sender,
+        logs_sender.clone(),
         orders_sender,
     )
     .unwrap_or_else(|err| {
@@ -268,6 +268,12 @@ fn main() {
                 if trader.get_pnl() < -sl_pnl.abs() {
                     sl_triggered = true;
                     trader.flat();
+                    logs_sender
+                        .send(Log::new(
+                            LogLevel::Error("SL".to_string()),
+                            format!("Stop-loss triggered at pnl: {:.2}", trader.get_pnl()),
+                        ))
+                        .unwrap()
                 }
             }
         }
