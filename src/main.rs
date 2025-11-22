@@ -11,7 +11,7 @@ use graphics::{
     CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
 };
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{ColorSchema, Config, Interval, Layout, LogManager, Lot, PxPerTick};
+use models::{ColorSchema, Config, Interval, Layout, LogManager, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::Decimal;
 use std::sync::mpsc;
@@ -47,15 +47,6 @@ fn main() {
     });
 
     let mut size_range = Decimal::ZERO;
-    let lot = Lot::new(
-        config.lost_size.unwrap(),
-        [
-            config.lot_mult_1.unwrap(),
-            config.lot_mult_2.unwrap(),
-            config.lot_mult_3.unwrap(),
-            config.lot_mult_4.unwrap(),
-        ],
-    );
 
     let mut window_width = config.window_width;
     let mut window_height = config.window_height;
@@ -84,7 +75,17 @@ fn main() {
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
-    let mut trader = Trader::new(symbol.clone(), Orders::new(), lot);
+    let mut trader = Trader::new(
+        symbol.clone(),
+        Orders::new(),
+        [
+            config.lot_mult_1.unwrap(),
+            config.lot_mult_2.unwrap(),
+            config.lot_mult_3.unwrap(),
+            config.lot_mult_4.unwrap(),
+        ],
+        config.lot_size.unwrap(),
+    );
 
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
@@ -103,7 +104,7 @@ fn main() {
 
         {
             let order_book = shared_state.order_book.read().unwrap();
-            trader.update_bid_ask(order_book.bid(), order_book.ask());
+            trader.set_bid_ask(order_book.bid(), order_book.ask());
         }
 
         logs_manager.consume();
@@ -150,19 +151,19 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
-            trader.select_size(0);
+            trader.set_size_multiplier_index(0);
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
-            trader.select_size(1);
+            trader.set_size_multiplier_index(1);
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
-            trader.select_size(2);
+            trader.set_size_multiplier_index(2);
         }
 
         if window.is_key_pressed(Key::Key4, minifb::KeyRepeat::No) {
-            trader.select_size(3);
+            trader.set_size_multiplier_index(3);
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {

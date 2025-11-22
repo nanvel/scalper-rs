@@ -22,7 +22,7 @@ pub struct Config {
     pub binance_secret_key: Option<String>,
 
     #[serde(default = "default_size")]
-    pub lost_size: Option<Decimal>,
+    pub lot_size: Option<Decimal>,
     #[serde(default = "default_mult_1")]
     pub lot_mult_1: Option<usize>,
     #[serde(default = "default_mult_2")]
@@ -107,7 +107,7 @@ impl Config {
             config.exchange = exchange;
         }
         if let Some(lot_size) = cli_overrides.lot_size {
-            config.lost_size = Some(lot_size);
+            config.lot_size = Some(lot_size);
         }
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);

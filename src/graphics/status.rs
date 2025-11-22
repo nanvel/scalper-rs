@@ -1,5 +1,5 @@
 use super::text::TextRenderer;
-use crate::models::{Area, ColorSchema, Interval, Lot, Orders, Status};
+use crate::models::{Area, ColorSchema, Interval, Status};
 use crate::trader::Trader;
 use chrono::Utc;
 use f64_fixed::to_fixed_string;
@@ -67,8 +67,8 @@ impl StatusRenderer {
         let left_text = format!(
             "{} <{} x {}> {} {}",
             interval.slug(),
-            trader.get_size().to_string(),
-            trader.get_multiplier().to_string(),
+            trader.size_quote.to_string(),
+            trader.get_size_multiplier().to_string(),
             now.format("%H:%M:%S").to_string(),
             to_fixed_string(trader.get_lots(), 6),
         );
