@@ -1,16 +1,21 @@
 use crate::models::Color;
+use font_kit::family_name::FamilyName;
 use font_kit::font::Font;
+use font_kit::properties::Properties;
+use font_kit::source::SystemSource;
 use raqote::{DrawOptions, DrawTarget, Point, Source};
-use std::fs;
 
 pub struct TextRenderer {
     font: Font,
 }
 
 impl TextRenderer {
-    pub fn new(font_path: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let font_data = fs::read(font_path.to_string())?;
-        let font = Font::from_bytes(font_data.into(), 0)?;
+    pub fn new() -> Result<Self, Box<dyn std::error::Error>> {
+        let font = SystemSource::new()
+            .select_best_match(&[FamilyName::Monospace], &Properties::new())
+            .unwrap()
+            .load()
+            .unwrap();
         Ok(Self { font })
     }
 

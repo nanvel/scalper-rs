@@ -66,11 +66,10 @@ fn main() {
 
     let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
     let mut layout = Layout::new(window_width as i32, window_height as i32);
-    let text_renderer =
-        TextRenderer::new("/System/Library/Fonts/SFNSMono.ttf").unwrap_or_else(|err| {
-            eprintln!("Error loading font: {}", err);
-            std::process::exit(1);
-        });
+    let text_renderer = TextRenderer::new().unwrap_or_else(|err| {
+        eprintln!("Error loading font: {}", err);
+        std::process::exit(1);
+    });
     let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
     let mut orders_renderer = OrdersRenderer::new(layout.orders_area);
     let mut order_book_renderer = OrderBookRenderer::new(layout.order_book_area);

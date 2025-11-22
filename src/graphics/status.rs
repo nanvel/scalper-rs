@@ -65,11 +65,11 @@ impl StatusRenderer {
         let now = Utc::now();
 
         let left_text = format!(
-            "{} <{} x {}> {} {}",
+            "{} <{} X {}> {} {}",
             interval.slug(),
             trader.size_quote.to_string(),
             trader.get_size_multiplier().to_string(),
-            now.format("%H:%M:%S").to_string(),
+            now.format("%H:%M:%S UTC").to_string(),
             to_fixed_string(trader.get_lots(), 6),
         );
         text_renderer.draw(
