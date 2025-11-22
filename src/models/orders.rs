@@ -71,10 +71,6 @@ impl Order {
             is_update,
         }
     }
-
-    pub fn is_filled(&self) -> bool {
-        self.order_status == OrderStatus::Filled && self.executed_quantity > Decimal::ZERO
-    }
 }
 
 pub struct Orders {
@@ -147,15 +143,6 @@ impl Orders {
         received - spent
     }
 
-    pub fn all(&self) -> Vec<&Order> {
-        self.orders
-            .iter()
-            .filter(|o| {
-                o.order_status == OrderStatus::Pending || o.executed_quantity > Decimal::ZERO
-            })
-            .collect()
-    }
-
     pub fn open(&self) -> Vec<&Order> {
         self.orders
             .iter()
@@ -170,19 +157,5 @@ impl Orders {
                 o.order_status == OrderStatus::Filled && o.executed_quantity > Decimal::ZERO
             })
             .max_by_key(|o| o.timestamp)
-    }
-
-    pub fn open_limit(&self) -> usize {
-        self.orders
-            .iter()
-            .filter(|o| o.order_type == OrderType::Limit && o.order_status == OrderStatus::Pending)
-            .count()
-    }
-
-    pub fn open_stop(&self) -> usize {
-        self.orders
-            .iter()
-            .filter(|o| o.order_type == OrderType::Stop && o.order_status == OrderStatus::Pending)
-            .count()
     }
 }
