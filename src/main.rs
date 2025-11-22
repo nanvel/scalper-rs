@@ -1,6 +1,7 @@
 mod exchanges;
 mod graphics;
 mod models;
+mod renderer;
 mod trader;
 
 use crate::exchanges::ExchangeFactory;
