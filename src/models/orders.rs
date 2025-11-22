@@ -71,10 +71,6 @@ impl Order {
             is_update,
         }
     }
-
-    pub fn is_filled(&self) -> bool {
-        self.order_status == OrderStatus::Filled && self.executed_quantity > Decimal::ZERO
-    }
 }
 
 pub struct Orders {
@@ -147,15 +143,6 @@ impl Orders {
         received - spent
     }
 
-    pub fn all(&self) -> Vec<&Order> {
-        self.orders
-            .iter()
-            .filter(|o| {
-                o.order_status == OrderStatus::Pending || o.executed_quantity > Decimal::ZERO
-            })
-            .collect()
-    }
-
     pub fn open(&self) -> Vec<&Order> {
         self.orders
             .iter()
@@ -172,17 +159,28 @@ impl Orders {
             .max_by_key(|o| o.timestamp)
     }
 
-    pub fn open_limit(&self) -> usize {
-        self.orders
-            .iter()
-            .filter(|o| o.order_type == OrderType::Limit && o.order_status == OrderStatus::Pending)
-            .count()
-    }
-
-    pub fn open_stop(&self) -> usize {
-        self.orders
-            .iter()
-            .filter(|o| o.order_type == OrderType::Stop && o.order_status == OrderStatus::Pending)
-            .count()
+    pub fn entry_price(&self) -> Option<Decimal> {
+        let mut total_qty = Decimal::ZERO;
+        let mut total_cost = Decimal::ZERO;
+        for order in &self.orders {
+            if order.order_status == OrderStatus::Filled && order.executed_quantity > Decimal::ZERO
+            {
+                match order.order_side {
+                    OrderSide::Buy => {
+                        total_cost += order.average_price * order.executed_quantity;
+                        total_qty += order.executed_quantity;
+                    }
+                    OrderSide::Sell => {
+                        total_cost -= order.average_price * order.executed_quantity;
+                        total_qty -= order.executed_quantity;
+                    }
+                }
+            }
+        }
+        if total_qty != Decimal::ZERO {
+            Some(total_cost / total_qty)
+        } else {
+            None
+        }
     }
 }

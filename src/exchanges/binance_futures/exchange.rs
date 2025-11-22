@@ -17,7 +17,6 @@ use tokio::time::sleep;
 pub struct BinanceFuturesExchange {
     name: &'static str,
     symbol: String,
-    interval: Interval,
     candles_limit: usize,
     logs_sender: Sender<Log>,
     orders_sender: Sender<Order>,
@@ -32,13 +31,14 @@ impl Exchange for BinanceFuturesExchange {
         self.name
     }
 
-    fn start(&mut self) -> Result<(Symbol, SharedState), Box<dyn std::error::Error>> {
+    fn start(
+        &mut self,
+        interval: Interval,
+    ) -> Result<(Symbol, SharedState), Box<dyn std::error::Error>> {
         let symbol = self.client.get_symbol_sync()?;
 
-        let shared_candles_state = Arc::new(RwLock::new(CandlesState::new(
-            self.candles_limit,
-            self.interval.clone(),
-        )));
+        let shared_candles_state =
+            Arc::new(RwLock::new(CandlesState::new(self.candles_limit, interval)));
         let shared_order_book_state = Arc::new(RwLock::new(OrderBookState::new()));
         let shared_order_flow_state = Arc::new(RwLock::new(OrderFlowState::new()));
         let shared_open_interest_state = Arc::new(RwLock::new(OpenInterestState::new()));
@@ -56,7 +56,7 @@ impl Exchange for BinanceFuturesExchange {
 
         let client_clone = self.client.clone();
 
-        self.set_interval(self.interval);
+        self.set_interval(interval);
 
         let keep_listen_key_alive = async |client: &BinanceClient, logs_sender: &Sender<Log>| {
             loop {
@@ -149,7 +149,7 @@ impl Exchange for BinanceFuturesExchange {
         self.handle = None;
     }
 
-    fn set_interval(&mut self, interval: Interval) -> () {
+    fn set_interval(&self, interval: Interval) -> () {
         let interval_str = match interval {
             Interval::M1 => "1m",
             Interval::M5 => "5m",
@@ -164,13 +164,11 @@ impl Exchange for BinanceFuturesExchange {
 
         if let Some(shared_candles_state) = self.shared_candles_state.as_ref() {
             let mut buffer = shared_candles_state.write().unwrap();
-            buffer.clear(interval.clone());
+            buffer.clear(interval);
             for candle in candles {
                 buffer.push(candle);
             }
         }
-
-        self.interval = interval;
     }
 
     fn place_order(&self, new_order: NewOrder) -> () {
@@ -195,7 +193,6 @@ impl Exchange for BinanceFuturesExchange {
 impl BinanceFuturesExchange {
     pub fn new(
         symbol: String,
-        interval: Interval,
         candles_limit: usize,
         orders_sender: Sender<Order>,
         logs_sender: Sender<Log>,
@@ -211,7 +208,6 @@ impl BinanceFuturesExchange {
         Self {
             name: "Binance USD Futures",
             symbol,
-            interval,
             candles_limit,
             logs_sender,
             orders_sender,

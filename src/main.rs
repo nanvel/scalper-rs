@@ -11,7 +11,7 @@ use graphics::{
     CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
 };
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{ColorSchema, Config, Interval, Layout, LogManager, Lot, PxPerTick};
+use models::{ColorSchema, Config, Interval, Layout, LogManager, PxPerTick};
 use raqote::DrawTarget;
 use rust_decimal::Decimal;
 use std::sync::mpsc;
@@ -31,7 +31,6 @@ fn main() {
     let mut exchange = ExchangeFactory::create(
         config.exchange.as_str(),
         config.symbol.clone(),
-        interval,
         200,
         &config,
         logs_sender,
@@ -42,21 +41,12 @@ fn main() {
         std::process::exit(1);
     });
 
-    let (symbol, shared_state) = exchange.start().unwrap_or_else(|err| {
+    let (symbol, shared_state) = exchange.start(interval).unwrap_or_else(|err| {
         logs_manager.log_error(&format!("Error starting streams: {}", err));
         std::process::exit(1);
     });
 
     let mut size_range = Decimal::ZERO;
-    let lot = Lot::new(
-        config.lost_size.unwrap(),
-        [
-            config.lot_mult_1.unwrap(),
-            config.lot_mult_2.unwrap(),
-            config.lot_mult_3.unwrap(),
-            config.lot_mult_4.unwrap(),
-        ],
-    );
 
     let mut window_width = config.window_width;
     let mut window_height = config.window_height;
@@ -85,7 +75,18 @@ fn main() {
     let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
     let mut status_renderer = StatusRenderer::new(layout.status_area);
 
-    let mut trader = Trader::new(&mut exchange, symbol.clone(), Orders::new(), lot);
+    let mut trader = Trader::new(
+        symbol.clone(),
+        Orders::new(),
+        [
+            config.lot_mult_1.unwrap(),
+            config.lot_mult_2.unwrap(),
+            config.lot_mult_3.unwrap(),
+            config.lot_mult_4.unwrap(),
+        ],
+        config.lot_size.unwrap(),
+        config.sl_pnl,
+    );
 
     let mut center: Option<Decimal> = None;
     let mut px_per_tick = PxPerTick::default();
@@ -104,7 +105,7 @@ fn main() {
 
         {
             let order_book = shared_state.order_book.read().unwrap();
-            trader.update_bid_ask(order_book.bid(), order_book.ask());
+            trader.set_bid_ask(order_book.bid(), order_book.ask());
         }
 
         logs_manager.consume();
@@ -151,35 +152,43 @@ fn main() {
         }
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
-            trader.select_size(0);
+            trader.set_size_multiplier_index(0);
         }
 
         if window.is_key_pressed(Key::Key2, minifb::KeyRepeat::No) {
-            trader.select_size(1);
+            trader.set_size_multiplier_index(1);
         }
 
         if window.is_key_pressed(Key::Key3, minifb::KeyRepeat::No) {
-            trader.select_size(2);
+            trader.set_size_multiplier_index(2);
         }
 
         if window.is_key_pressed(Key::Key4, minifb::KeyRepeat::No) {
-            trader.select_size(3);
+            trader.set_size_multiplier_index(3);
         }
 
         if window.is_key_pressed(Key::Equal, minifb::KeyRepeat::No) {
-            trader.place_market_buy();
+            if let Some(new_order) = trader.market_buy() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::Minus, minifb::KeyRepeat::No) {
-            trader.place_market_sell();
+            if let Some(new_order) = trader.market_sell() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::Key0, minifb::KeyRepeat::No) {
-            trader.flat();
+            if let Some(new_order) = trader.flat() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::R, minifb::KeyRepeat::No) {
-            trader.reverse();
+            if let Some(new_order) = trader.reverse() {
+                exchange.place_order(new_order);
+            }
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
@@ -204,7 +213,7 @@ fn main() {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
-                trader.set_interval(new_interval);
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -216,7 +225,7 @@ fn main() {
             let new_interval = interval.down();
             if new_interval != interval {
                 interval = new_interval;
-                trader.set_interval(new_interval);
+                exchange.set_interval(new_interval);
                 center = None;
                 force_redraw = true;
             }
@@ -234,9 +243,13 @@ fn main() {
                             + center_price;
                         if window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift)
                         {
-                            trader.place_stop(price);
+                            if let Some(new_order) = trader.limit(price) {
+                                exchange.place_order(new_order);
+                            }
                         } else {
-                            trader.place_limit(price);
+                            if let Some(new_order) = trader.stop(price) {
+                                exchange.place_order(new_order);
+                            }
                         };
                     }
                 }
@@ -245,7 +258,9 @@ fn main() {
         left_was_pressed = left_pressed;
 
         if window.is_key_pressed(Key::C, minifb::KeyRepeat::No) {
-            trader.cancel_all()
+            for o in trader.get_open_orders() {
+                exchange.cancel_order(o.id.clone());
+            }
         }
 
         if trader.bid.is_some() && !sl_triggered {
@@ -271,6 +286,7 @@ fn main() {
                 px_per_tick.get(),
                 trader.get_open_orders(),
                 trader.get_last_closed_order(),
+                trader.get_sl_price(),
                 force_redraw,
             );
             order_book_renderer.render(
