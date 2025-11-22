@@ -37,6 +37,7 @@ impl CandlesRenderer {
         px_per_tick: Decimal,
         open_orders: Vec<&Order>,
         last_closed_order: Option<&Order>,
+        sl_price: Option<Decimal>,
         force_redraw: bool,
     ) {
         if !force_redraw {
@@ -404,6 +405,26 @@ impl CandlesRenderer {
             pb.close();
             let path = pb.finish();
             dt.fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
+        }
+
+        if let Some(sl_price) = sl_price {
+            let y = price_to_y(sl_price);
+            let mut pb = PathBuilder::new();
+            pb.move_to(self.area.left as f32, y as f32);
+            pb.line_to((self.area.left + self.area.width) as f32, y as f32);
+            let path = pb.finish();
+
+            dt.stroke(
+                &path,
+                &Source::Solid(color_schema.text_error.into()),
+                &StrokeStyle {
+                    width: 1.0,
+                    cap: LineCap::Round,
+                    join: LineJoin::Round,
+                    ..Default::default()
+                },
+                &DrawOptions::new(),
+            );
         }
     }
 }

@@ -85,6 +85,7 @@ fn main() {
             config.lot_mult_4.unwrap(),
         ],
         config.lot_size.unwrap(),
+        config.sl_pnl,
     );
 
     let mut center: Option<Decimal> = None;
@@ -285,6 +286,7 @@ fn main() {
                 px_per_tick.get(),
                 trader.get_open_orders(),
                 trader.get_last_closed_order(),
+                trader.get_sl_price(),
                 force_redraw,
             );
             order_book_renderer.render(

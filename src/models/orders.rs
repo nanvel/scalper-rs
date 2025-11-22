@@ -158,4 +158,29 @@ impl Orders {
             })
             .max_by_key(|o| o.timestamp)
     }
+
+    pub fn entry_price(&self) -> Option<Decimal> {
+        let mut total_qty = Decimal::ZERO;
+        let mut total_cost = Decimal::ZERO;
+        for order in &self.orders {
+            if order.order_status == OrderStatus::Filled && order.executed_quantity > Decimal::ZERO
+            {
+                match order.order_side {
+                    OrderSide::Buy => {
+                        total_cost += order.average_price * order.executed_quantity;
+                        total_qty += order.executed_quantity;
+                    }
+                    OrderSide::Sell => {
+                        total_cost -= order.average_price * order.executed_quantity;
+                        total_qty -= order.executed_quantity;
+                    }
+                }
+            }
+        }
+        if total_qty != Decimal::ZERO {
+            Some(total_cost / total_qty)
+        } else {
+            None
+        }
+    }
 }

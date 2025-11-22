@@ -11,6 +11,7 @@ pub struct Trader {
     size_base: Option<Decimal>,
     pub bid: Option<Decimal>,
     pub ask: Option<Decimal>,
+    sl_pnl: Option<Decimal>,
 }
 
 impl Trader {
@@ -19,6 +20,7 @@ impl Trader {
         orders: Orders,
         size_multiplier_options: [usize; 4],
         size_quote: Decimal,
+        sl_pnl: Option<Decimal>,
     ) -> Self {
         Trader {
             symbol,
@@ -29,6 +31,7 @@ impl Trader {
             size_base: None,
             bid: None,
             ask: None,
+            sl_pnl,
         }
     }
 
@@ -212,5 +215,23 @@ impl Trader {
         if ask.is_some() {
             self.ask = ask;
         }
+    }
+
+    pub fn get_sl_price(&self) -> Option<Decimal> {
+        let balance = self.orders.base_balance();
+        if balance == Decimal::ZERO {
+            return None;
+        }
+        if let Some(sl_pnl) = self.sl_pnl {
+            if let Some(entry_price) = self.orders.entry_price() {
+                let size = balance.abs();
+                if balance > Decimal::ZERO {
+                    return Some(entry_price + (sl_pnl / size));
+                } else if balance < Decimal::ZERO {
+                    return Some(entry_price - (sl_pnl / size));
+                }
+            }
+        }
+        None
     }
 }
