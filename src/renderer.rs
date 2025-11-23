@@ -414,11 +414,12 @@ impl Renderer {
         );
 
         let left_text = format!(
-            "{} <{} X {}> {}",
+            "{} <{} X {}> {} {}",
             interval.slug(),
             trader.size_quote.to_string(),
             trader.get_size_multiplier().to_string(),
-            to_fixed_string(trader.get_lots(), 6),
+            trader.get_lots(),
+            trader.get_open_orders().len(),
         );
         self.dt.draw_text(
             &self.font,
