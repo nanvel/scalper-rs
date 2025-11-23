@@ -43,7 +43,7 @@ impl Renderer {
         font: Font,
     ) -> Self {
         let layout = Layout::new(width as i32, height as i32);
-        let center_px = ((layout.candles_area.height - 80) / 2) as usize;
+        let center_px = layout.center_px() as usize;
         Self {
             dt: DrawTarget::new(width as i32, height as i32),
             layout,
@@ -68,7 +68,7 @@ impl Renderer {
             self.layout = Layout::new(width, height);
             self.force_redraw = true;
             self.dt = DrawTarget::new(width, height);
-            self.center_px = ((self.layout.candles_area.height - 80) / 2) as usize;
+            self.center_px = self.layout.center_px() as usize;
             self.center_price = Decimal::ZERO;
         }
     }
@@ -171,7 +171,7 @@ impl Renderer {
 
         self.dt.fill_rect(
             area.left as f32,
-            (area.top + area.height - 106) as f32,
+            (area.top + area.height - self.layout.volume_height - 26) as f32,
             100_f32,
             20_f32,
             &Source::Solid(self.color_schema.background.into()),
@@ -182,7 +182,10 @@ impl Renderer {
             &self.font,
             (16 * 72 / 96) as f32,
             &now.format("%H:%M:%S UTC").to_string(),
-            Point::new((area.left + 4) as f32, (area.top + area.height - 92) as f32),
+            Point::new(
+                (area.left + 4) as f32,
+                (area.top + area.height - self.layout.volume_height - 12) as f32,
+            ),
             &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
         );
@@ -734,7 +737,7 @@ impl Renderer {
 
         let candle_width = 15;
         let body_width = 11;
-        let volume_height = 80;
+        let volume_height = self.layout.volume_height;
 
         for (i, candle) in candles.iter().rev().enumerate() {
             let x = area.width + area.left - (i as i32) * candle_width - 15;
@@ -916,7 +919,7 @@ impl Renderer {
         // current price
         self.dt.fill_rect(
             (area.left + area.width) as f32 - 60_f32,
-            (area.top + area.height) as f32 - 106_f32,
+            (area.top + area.height) as f32 - volume_height as f32 - 26_f32,
             59_f32,
             20_f32,
             &Source::Solid(self.color_schema.background.into()),
@@ -929,7 +932,7 @@ impl Renderer {
             &to_fixed_string(current_price.to_f64().unwrap(), 8),
             Point::new(
                 (area.left + area.width - 55) as f32,
-                (area.top + area.height) as f32 - 92_f32,
+                (area.top + area.height) as f32 - volume_height as f32 - 12_f32,
             ),
             &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
@@ -941,7 +944,7 @@ impl Renderer {
             >= Decimal::from(self.layout.height / 4)
         {
             self.center_price = price;
-            self.center_px = ((self.layout.candles_area.height - 80) / 2) as usize;
+            self.center_px = self.layout.center_px() as usize;
         }
     }
 

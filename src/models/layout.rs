@@ -14,6 +14,7 @@ pub struct Layout {
     pub order_book_area: Area,
     pub order_flow_area: Area,
     pub status_area: Area,
+    pub volume_height: i32,
 }
 
 impl Layout {
@@ -22,6 +23,7 @@ impl Layout {
         let order_flow_width = 100;
         let status_height = 20;
         let orders_width = 50;
+        let volume_height = 80;
 
         let status_area = Area {
             left: 0,
@@ -66,6 +68,11 @@ impl Layout {
             order_book_area,
             order_flow_area,
             status_area,
+            volume_height,
         }
+    }
+
+    pub fn center_px(&self) -> i32 {
+        (self.candles_area.height - 80) / 2
     }
 }
