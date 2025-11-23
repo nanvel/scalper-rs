@@ -182,11 +182,11 @@ fn main() {
                 let price = renderer.px_to_price(y as i32);
                 if price > Decimal::ZERO {
                     if shift_pressed {
-                        if let Some(new_order) = trader.limit(price) {
+                        if let Some(new_order) = trader.stop(price) {
                             exchange.place_order(new_order);
                         }
                     } else {
-                        if let Some(new_order) = trader.stop(price) {
+                        if let Some(new_order) = trader.limit(price) {
                             exchange.place_order(new_order);
                         }
                     };
