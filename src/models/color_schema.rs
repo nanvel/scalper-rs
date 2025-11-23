@@ -39,6 +39,7 @@ pub struct ColorSchema {
     pub border: Color,
     pub crosshair: Color,
     pub scale_bar: Color,
+    pub sl_line: Color,
 
     pub status_ok: Color,
     pub status_warning: Color,
@@ -78,6 +79,7 @@ impl ColorSchema {
             border: Color::new(55, 65, 81, 255),       // #374151
             crosshair: Color::new(156, 163, 175, 255), // #9CA3AF
             scale_bar: Color::new(139, 92, 246, 255),  // #8B5CF6
+            sl_line: Color::new(220, 38, 38, 255),     // #DC2626
 
             // status
             status_ok: Color::new(16, 185, 129, 255), // #10B981
@@ -118,6 +120,7 @@ impl ColorSchema {
             border: Color::new(229, 231, 235, 255), // #E5E7EB
             crosshair: Color::new(107, 114, 128, 255), // #6B7280
             scale_bar: Color::new(139, 92, 246, 255), // #8B5CF6
+            sl_line: Color::new(220, 38, 38, 255),  // #DC2626
 
             // status
             status_ok: Color::new(5, 150, 105, 255), // #059669

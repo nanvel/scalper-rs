@@ -104,7 +104,8 @@ impl Renderer {
 
     pub fn px_to_price(&self, px: i32) -> Decimal {
         self.center_price
-            - Decimal::from(px - (self.center_px as i32)) / self.px_per_tick * self.tick_size
+            - (Decimal::from(px - (self.center_px as i32)) / self.px_per_tick).round()
+                * self.tick_size
     }
 
     pub fn render(
@@ -303,20 +304,21 @@ impl Renderer {
             };
 
             let y = self.price_to_px(order.price);
+
             let mut pb = PathBuilder::new();
-            pb.move_to((area.left + area.width - 3) as f32, y as f32);
-            pb.line_to(((area.left + area.width) - 10) as f32, (y - 4) as f32);
-            pb.line_to(((area.left + area.width) - 10) as f32, (y + 4) as f32);
-            pb.close();
+            pb.move_to(area.left as f32 + 3_f32, y as f32);
+            pb.line_to((area.left + area.width) as f32 - 1_f32, y as f32);
             let path = pb.finish();
-            let stroke_style = StrokeStyle {
-                width: 1.0,
-                ..Default::default()
-            };
+
             self.dt.stroke(
                 &path,
-                &Source::Solid(color.into()),
-                &stroke_style,
+                &Source::Solid(color.with_alpha(100).into()),
+                &StrokeStyle {
+                    width: 1.0,
+                    cap: LineCap::Round,
+                    join: LineJoin::Round,
+                    ..Default::default()
+                },
                 &DrawOptions::new(),
             );
         }
@@ -330,27 +332,35 @@ impl Renderer {
 
             let y = self.price_to_px(order.average_price);
             let mut pb = PathBuilder::new();
-            pb.move_to((area.left + area.width - 3) as f32, y as f32);
-            pb.line_to(((area.left + area.width) - 10) as f32, (y - 4) as f32);
-            pb.line_to(((area.left + area.width) - 10) as f32, (y + 4) as f32);
-            pb.close();
+            pb.move_to(area.left as f32 + 3_f32, y as f32);
+            pb.line_to((area.left + area.width) as f32 - 1_f32, y as f32);
             let path = pb.finish();
-            self.dt
-                .fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
+
+            self.dt.stroke(
+                &path,
+                &Source::Solid(color.into()),
+                &StrokeStyle {
+                    width: 2.0,
+                    cap: LineCap::Round,
+                    join: LineJoin::Round,
+                    ..Default::default()
+                },
+                &DrawOptions::new(),
+            );
         }
 
         if let Some(sl_price) = trader.get_sl_price() {
             let y = self.price_to_px(sl_price);
             let mut pb = PathBuilder::new();
-            pb.move_to(area.left as f32, y as f32);
-            pb.line_to((area.left + area.width) as f32, y as f32);
+            pb.move_to(area.left as f32 + 3_f32, y as f32);
+            pb.line_to((area.left + area.width) as f32 - 1_f32, y as f32);
             let path = pb.finish();
 
             self.dt.stroke(
                 &path,
-                &Source::Solid(self.color_schema.text_error.into()),
+                &Source::Solid(self.color_schema.sl_line.into()),
                 &StrokeStyle {
-                    width: 1.0,
+                    width: 2.0,
                     cap: LineCap::Round,
                     join: LineJoin::Round,
                     ..Default::default()
