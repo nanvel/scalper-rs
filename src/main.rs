@@ -1,5 +1,4 @@
 mod exchanges;
-mod graphics;
 mod models;
 mod renderer;
 mod trader;
@@ -9,6 +8,9 @@ use crate::models::{Log, LogLevel, Orders};
 use crate::renderer::Renderer;
 use crate::trader::Trader;
 use console::Term;
+use font_kit::family_name::FamilyName;
+use font_kit::properties::Properties;
+use font_kit::source::SystemSource;
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
 use models::{ColorSchema, Config, Interval, LogManager};
 use rust_decimal::Decimal;
@@ -69,11 +71,17 @@ fn main() {
         config.sl_pnl,
     );
 
+    let font = SystemSource::new()
+        .select_best_match(&[FamilyName::Monospace], &Properties::new())
+        .unwrap()
+        .load()
+        .unwrap();
     let mut renderer = Renderer::new(
         config.window_width,
         config.window_height,
         symbol.tick_size,
         ColorSchema::for_theme(config.theme),
+        font,
     );
 
     let mut force_redraw = true;
@@ -214,6 +222,7 @@ fn main() {
             &shared_state,
             &trader,
             logs_manager.status(),
+            interval,
             ctrl_pressed,
             force_redraw,
         );

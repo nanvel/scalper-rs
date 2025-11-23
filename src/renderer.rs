@@ -1,10 +1,14 @@
 use crate::models::{
-    CandlesState, ColorSchema, Layout, OpenInterestState, OrderBookState, OrderFlowState,
-    SharedState, Status, Timestamp,
+    CandlesState, ColorSchema, Interval, Layout, OpenInterestState, OrderBookState, OrderFlowState,
+    OrderSide, SharedState, Status, Timestamp,
 };
 use crate::trader::Trader;
+use chrono::Utc;
+use f64_fixed::to_fixed_string;
+use font_kit::font::Font;
 use raqote::{
-    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, SolidSource, Source, StrokeStyle,
+    DrawOptions, DrawTarget, LineCap, LineJoin, PathBuilder, Point, SolidSource, Source,
+    StrokeStyle,
 };
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromStr, ToPrimitive};
@@ -17,6 +21,7 @@ const PX_PER_TICK_CHOICES: [&str; 17] = [
 pub struct Renderer {
     dt: DrawTarget,
     layout: Layout,
+    font: Font,
     book_entry_range: Decimal,
     center_px: usize,
     center_price: Decimal,
@@ -30,10 +35,17 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(width: usize, height: usize, tick_size: Decimal, color_schema: ColorSchema) -> Self {
+    pub fn new(
+        width: usize,
+        height: usize,
+        tick_size: Decimal,
+        color_schema: ColorSchema,
+        font: Font,
+    ) -> Self {
         Self {
             dt: DrawTarget::new(width as i32, height as i32),
             layout: Layout::new(width as i32, height as i32),
+            font,
             book_entry_range: Decimal::ZERO,
             center_px: height / 2,
             center_price: Decimal::ZERO,
@@ -100,6 +112,7 @@ impl Renderer {
         shared_state: &SharedState,
         trader: &Trader,
         status: Status,
+        interval: Interval,
         locked: bool,
         force_redraw: bool,
     ) {
@@ -134,6 +147,7 @@ impl Renderer {
 
         if self.order_book_updated != order_book_updated || self.force_redraw {
             self.draw_order_book(&shared_state.order_book.read().unwrap());
+            self.draw_orders(trader, price);
             self.order_book_updated = order_book_updated;
         }
 
@@ -142,7 +156,276 @@ impl Renderer {
             self.order_flow_updated = order_flow_updated;
         }
 
+        self.draw_status(&status, &interval, trader);
+
         self.force_redraw = false;
+    }
+
+    fn draw_orders(&mut self, trader: &Trader, price: Decimal) {
+        let area = self.layout.orders_area;
+
+        self.dt.fill_rect(
+            area.left as f32,
+            area.top as f32,
+            area.width as f32,
+            area.height as f32,
+            &Source::Solid(self.color_schema.background.into()),
+            &DrawOptions::new(),
+        );
+
+        let mut pb = PathBuilder::new();
+        pb.rect(area.left as f32, area.top as f32, 2.0, area.height as f32);
+        let path = pb.finish();
+
+        self.dt.fill(
+            &path,
+            &Source::Solid(self.color_schema.border.into()),
+            &DrawOptions::new(),
+        );
+
+        // scale
+        let visible_ticks = (area.height as f64) / self.px_per_tick.to_f64().unwrap();
+        let mut m = 1;
+        while visible_ticks / m.to_f64().unwrap() > 10.0 {
+            m *= 10;
+        }
+        if visible_ticks / m.to_f64().unwrap() > 4. {
+            m *= 2;
+        }
+        let m = Decimal::from(m) * self.tick_size;
+        let tick_price = (self.center_price / m).floor() * m;
+
+        self.dt.draw_text(
+            &self.font,
+            (14 * 72 / 96) as f32,
+            &to_fixed_string(tick_price.to_f64().unwrap(), 8),
+            Point::new(
+                (area.left + 4) as f32,
+                self.price_to_px(tick_price) as f32 + 4_f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
+
+        let mut pb = PathBuilder::new();
+        let delta = tick_price / Decimal::from(100);
+        pb.rect(
+            area.left as f32,
+            self.price_to_px(tick_price + delta) as f32,
+            2.0,
+            (self.price_to_px(tick_price) - self.price_to_px(tick_price + delta)) as f32,
+        );
+        let path = pb.finish();
+
+        self.dt.fill(
+            &path,
+            &Source::Solid(self.color_schema.scale_bar.into()),
+            &DrawOptions::new(),
+        );
+
+        for i in 1..3 {
+            let tp = tick_price + m * Decimal::from(i);
+            self.dt.draw_text(
+                &self.font,
+                (14 * 72 / 96) as f32,
+                &to_fixed_string(tp.to_f64().unwrap(), 8),
+                Point::new((area.left + 4) as f32, self.price_to_px(tp) as f32 + 4_f32),
+                &Source::Solid(self.color_schema.text_light.into()),
+                &DrawOptions::new(),
+            );
+        }
+
+        for i in 1..3 {
+            let tp = tick_price - m * Decimal::from(i);
+            self.dt.draw_text(
+                &self.font,
+                (14 * 72 / 96) as f32,
+                &to_fixed_string(tp.to_f64().unwrap(), 8),
+                Point::new((area.left + 4) as f32, self.price_to_px(tp) as f32 + 4_f32),
+                &Source::Solid(self.color_schema.text_light.into()),
+                &DrawOptions::new(),
+            );
+        }
+
+        // current price line
+        let mut pb = PathBuilder::new();
+        pb.move_to(area.left as f32, self.price_to_px(price) as f32);
+        pb.line_to(
+            (area.left + area.width) as f32,
+            self.price_to_px(price) as f32,
+        );
+        let path = pb.finish();
+
+        self.dt.stroke(
+            &path,
+            &Source::Solid(self.color_schema.crosshair.into()),
+            &StrokeStyle {
+                width: 1.0,
+                cap: LineCap::Round,
+                join: LineJoin::Round,
+                ..Default::default()
+            },
+            &DrawOptions::new(),
+        );
+
+        self.dt.draw_text(
+            &self.font,
+            (14 * 72 / 96) as f32,
+            &to_fixed_string(price.to_f64().unwrap(), 8),
+            Point::new(
+                (area.left + 4) as f32,
+                self.price_to_px(price) as f32 + 4_f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
+
+        // orders
+        for order in trader.get_open_orders() {
+            let color = match order.order_side {
+                OrderSide::Buy => self.color_schema.volume_buy,
+                OrderSide::Sell => self.color_schema.volume_sell,
+            };
+
+            let y = self.price_to_px(order.price);
+            let mut pb = PathBuilder::new();
+            pb.move_to((area.left + area.width - 3) as f32, y as f32);
+            pb.line_to(((area.left + area.width) - 10) as f32, (y - 4) as f32);
+            pb.line_to(((area.left + area.width) - 10) as f32, (y + 4) as f32);
+            pb.close();
+            let path = pb.finish();
+            let stroke_style = StrokeStyle {
+                width: 1.0,
+                ..Default::default()
+            };
+            self.dt.stroke(
+                &path,
+                &Source::Solid(color.into()),
+                &stroke_style,
+                &DrawOptions::new(),
+            );
+        }
+
+        if let Some(order) = trader.get_last_closed_order() {
+            // solid triangle
+            let color = match order.order_side {
+                OrderSide::Buy => self.color_schema.volume_buy,
+                OrderSide::Sell => self.color_schema.volume_sell,
+            };
+
+            let y = self.price_to_px(order.average_price);
+            let mut pb = PathBuilder::new();
+            pb.move_to((area.left + area.width - 3) as f32, y as f32);
+            pb.line_to(((area.left + area.width) - 10) as f32, (y - 4) as f32);
+            pb.line_to(((area.left + area.width) - 10) as f32, (y + 4) as f32);
+            pb.close();
+            let path = pb.finish();
+            self.dt
+                .fill(&path, &Source::Solid(color.into()), &DrawOptions::new());
+        }
+
+        if let Some(sl_price) = trader.get_sl_price() {
+            let y = self.price_to_px(sl_price);
+            let mut pb = PathBuilder::new();
+            pb.move_to(area.left as f32, y as f32);
+            pb.line_to((area.left + area.width) as f32, y as f32);
+            let path = pb.finish();
+
+            self.dt.stroke(
+                &path,
+                &Source::Solid(self.color_schema.text_error.into()),
+                &StrokeStyle {
+                    width: 1.0,
+                    cap: LineCap::Round,
+                    join: LineJoin::Round,
+                    ..Default::default()
+                },
+                &DrawOptions::new(),
+            );
+        }
+    }
+
+    fn draw_status(&mut self, status: &Status, interval: &Interval, trader: &Trader) {
+        let area = self.layout.status_area;
+
+        self.dt.fill_rect(
+            area.left as f32,
+            area.top as f32,
+            area.width as f32,
+            area.height as f32,
+            &Source::Solid(self.color_schema.background.into()),
+            &DrawOptions::new(),
+        );
+
+        let status_text = match status {
+            Status::Ok => "OK".to_string(),
+            Status::Warning(msg) => msg.to_string(),
+            Status::Critical(msg) => msg.to_string(),
+        };
+        let status_color = match status {
+            Status::Ok => self.color_schema.status_ok,
+            Status::Warning(_) => self.color_schema.status_warning,
+            Status::Critical(_) => self.color_schema.status_critical,
+        };
+
+        self.dt.fill_rect(
+            area.left as f32,
+            area.top as f32,
+            50_f32,
+            area.height as f32,
+            &Source::Solid(status_color.into()),
+            &DrawOptions::new(),
+        );
+        self.dt.draw_text(
+            &self.font,
+            ((area.height - 4) * 72 / 96) as f32,
+            &format!("{:^6}", status_text),
+            Point::new(
+                (area.left + 4) as f32,
+                (area.top + area.height / 2 + 4) as f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
+
+        let now = Utc::now();
+
+        let left_text = format!(
+            "{} <{} X {}> {} {}",
+            interval.slug(),
+            trader.size_quote.to_string(),
+            trader.get_size_multiplier().to_string(),
+            now.format("%H:%M:%S UTC").to_string(),
+            to_fixed_string(trader.get_lots(), 6),
+        );
+        self.dt.draw_text(
+            &self.font,
+            ((area.height - 4) * 72 / 96) as f32,
+            &left_text,
+            Point::new(
+                (area.left + 54) as f32,
+                (area.top + area.height / 2 + 4) as f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
+
+        let pnl_text = format!(
+            "{} -{}",
+            to_fixed_string(trader.get_pnl().to_f64().unwrap(), 10),
+            to_fixed_string(trader.get_commission().to_f64().unwrap(), 10)
+        );
+        self.dt.draw_text(
+            &self.font,
+            ((area.height - 4) * 72 / 96) as f32,
+            &pnl_text,
+            Point::new(
+                (area.left + area.width - 200) as f32,
+                (area.top + area.height / 2 + 4) as f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
     }
 
     fn draw_order_flow(&mut self, order_flow_state: &OrderFlowState) {
