@@ -228,9 +228,9 @@ impl Trader {
             if let Some(entry_price) = self.orders.entry_price() {
                 let size = balance.abs();
                 if balance > Decimal::ZERO {
-                    return Some(entry_price + (sl_pnl / size));
-                } else if balance < Decimal::ZERO {
                     return Some(entry_price - (sl_pnl / size));
+                } else if balance < Decimal::ZERO {
+                    return Some(entry_price + (sl_pnl / size));
                 }
             }
         }
