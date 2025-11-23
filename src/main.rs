@@ -112,10 +112,12 @@ fn main() {
 
         logs_manager.consume();
 
+        let ctrl_pressed = window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl);
+        let shift_pressed =
+            window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift);
+
         // pause recenter if ctrl is pressed
-        if !(center.is_some()
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl)))
-        {
+        if !(center.is_some() && ctrl_pressed) {
             if trader.bid.is_some() && trader.ask.is_some() {
                 let current_center = Some(
                     ((trader.bid.unwrap() + trader.ask.unwrap())
@@ -194,25 +196,19 @@ fn main() {
             }
         }
 
-        if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
+        if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No) && shift_pressed {
             px_per_tick.scale_out();
             size_range = Decimal::ZERO;
             force_redraw = true;
         }
 
-        if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
+        if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No) && shift_pressed {
             px_per_tick.scale_in();
             size_range = Decimal::ZERO;
             force_redraw = true;
         }
 
-        if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
+        if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No) && shift_pressed {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
@@ -222,9 +218,7 @@ fn main() {
             }
         }
 
-        if window.is_key_pressed(Key::Left, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
+        if window.is_key_pressed(Key::Left, minifb::KeyRepeat::No) && shift_pressed {
             let new_interval = interval.down();
             if new_interval != interval {
                 interval = new_interval;
@@ -237,7 +231,7 @@ fn main() {
         let left_pressed = window.get_mouse_down(MouseButton::Left);
         if left_pressed && !left_was_pressed {
             if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
-                if window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl) {
+                if ctrl_pressed {
                     if let Some(center_price) = center {
                         let price = (Decimal::from(layout.candles_area.height / 2 - y as i32)
                             / px_per_tick.get())
