@@ -941,7 +941,7 @@ impl Renderer {
             >= Decimal::from(self.layout.height / 4)
         {
             self.center_price = price;
-            self.center_px = (self.layout.height / 2) as usize;
+            self.center_px = ((self.layout.candles_area.height - 80) / 2) as usize;
         }
     }
 
