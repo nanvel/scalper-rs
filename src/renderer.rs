@@ -1,5 +1,6 @@
 use crate::models::{
-    CandlesState, ColorSchema, Layout, OpenInterestState, SharedState, Status, Timestamp,
+    CandlesState, ColorSchema, Layout, OpenInterestState, OrderBookState, SharedState, Status,
+    Timestamp,
 };
 use crate::trader::Trader;
 use raqote::{
@@ -23,6 +24,7 @@ pub struct Renderer {
     tick_size: Decimal,
     color_schema: ColorSchema,
     candles_updated: Timestamp,
+    order_book_updated: Timestamp,
     force_redraw: bool,
 }
 
@@ -38,6 +40,7 @@ impl Renderer {
             tick_size,
             color_schema,
             candles_updated: Timestamp::from(0),
+            order_book_updated: Timestamp::from(0),
             force_redraw: true,
         }
     }
@@ -126,7 +129,144 @@ impl Renderer {
             );
             self.candles_updated = candles_updated;
         }
+
+        if self.order_book_updated != order_book_updated || self.force_redraw {
+            self.draw_order_book(&shared_state.order_book.read().unwrap());
+            self.order_book_updated = order_book_updated;
+        }
+
         self.force_redraw = false;
+    }
+
+    fn draw_order_book(&mut self, order_book_state: &OrderBookState) {
+        let area = self.layout.order_book_area;
+
+        self.dt.fill_rect(
+            area.left as f32,
+            area.top as f32,
+            area.width as f32,
+            area.height as f32,
+            &Source::Solid(self.color_schema.background.into()),
+            &DrawOptions::new(),
+        );
+
+        let left = area.left as f32;
+        let right = (area.left + area.width) as f32 - 10.0;
+        let max_width = Decimal::from((right - left) as u32);
+
+        let mut bid_buckets: Vec<Decimal> = vec![Decimal::ZERO; area.height as usize];
+        let mut ask_buckets: Vec<Decimal> = vec![Decimal::ZERO; area.height as usize];
+
+        for (price, quantity) in order_book_state.bids.iter() {
+            let price_diff = (self.center_price - *price) / self.tick_size;
+            let px_offset = (price_diff * self.px_per_tick).to_i32().unwrap_or(0);
+            let y = self.center_px as i32 + px_offset;
+            if y < 0 || y >= area.height {
+                continue;
+            }
+
+            bid_buckets[y as usize] += *quantity;
+        }
+
+        for (price, quantity) in order_book_state.asks.iter() {
+            let price_diff = (self.center_price - *price) / self.tick_size;
+            let px_offset = (price_diff * self.px_per_tick).to_i32().unwrap_or(0);
+            let y = self.center_px as i32 + px_offset;
+            if y < 0 || y >= area.height {
+                continue;
+            }
+
+            ask_buckets[y as usize] += *quantity;
+        }
+
+        let max_val = bid_buckets
+            .iter()
+            .cloned()
+            .max()
+            .unwrap_or(Decimal::ZERO)
+            .max(ask_buckets.iter().cloned().max().unwrap_or(Decimal::ZERO))
+            .max(self.book_entry_range);
+        if max_val.is_zero() {
+            return;
+        }
+
+        self.book_entry_range = max_val;
+
+        for (i, val) in bid_buckets.iter().enumerate() {
+            if val.is_zero() {
+                continue;
+            }
+
+            let width = (val / max_val * max_width).to_f32().unwrap_or(0.0);
+            let y = i as f32 + area.top as f32;
+
+            if self.px_per_tick == Decimal::from(3) {
+                self.dt.fill_rect(
+                    left,
+                    y - 1.0,
+                    width,
+                    3.0,
+                    &Source::Solid(self.color_schema.bid_bar.into()),
+                    &DrawOptions::new(),
+                );
+            } else if self.px_per_tick >= Decimal::from(5) {
+                self.dt.fill_rect(
+                    left,
+                    y - (self.px_per_tick.to_f32().unwrap() / 2.0).floor(),
+                    width,
+                    self.px_per_tick.to_f32().unwrap() - 2.0,
+                    &Source::Solid(self.color_schema.bid_bar.into()),
+                    &DrawOptions::new(),
+                );
+            } else {
+                self.dt.fill_rect(
+                    left,
+                    y,
+                    width,
+                    1.0,
+                    &Source::Solid(self.color_schema.bid_bar.into()),
+                    &DrawOptions::new(),
+                );
+            }
+        }
+
+        for (i, val) in ask_buckets.iter().enumerate() {
+            if val.is_zero() {
+                continue;
+            }
+
+            let width = (val / max_val * max_width).to_f32().unwrap_or(0.0);
+            let y = i as f32 + area.top as f32;
+
+            if self.px_per_tick == Decimal::from(3) {
+                self.dt.fill_rect(
+                    left,
+                    y - 1.0,
+                    width,
+                    3.0,
+                    &Source::Solid(self.color_schema.ask_bar.into()),
+                    &DrawOptions::new(),
+                );
+            } else if self.px_per_tick >= Decimal::from(5) {
+                self.dt.fill_rect(
+                    left,
+                    y - (self.px_per_tick.to_f32().unwrap() / 2.0).floor(),
+                    width,
+                    self.px_per_tick.to_f32().unwrap() - 2.0,
+                    &Source::Solid(self.color_schema.ask_bar.into()),
+                    &DrawOptions::new(),
+                );
+            } else {
+                self.dt.fill_rect(
+                    left,
+                    y,
+                    width,
+                    1.0,
+                    &Source::Solid(self.color_schema.ask_bar.into()),
+                    &DrawOptions::new(),
+                );
+            }
+        }
     }
 
     fn draw_candles(
