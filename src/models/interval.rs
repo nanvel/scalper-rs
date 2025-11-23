@@ -22,10 +22,10 @@ impl Interval {
 
     pub fn slug(&self) -> &'static str {
         match self {
-            Interval::M1 => "1m",
-            Interval::M5 => "5m",
-            Interval::M15 => "15m",
-            Interval::H1 => "1h",
+            Interval::M1 => "1M",
+            Interval::M5 => "5M",
+            Interval::M15 => "15M",
+            Interval::H1 => "1H",
         }
     }
 

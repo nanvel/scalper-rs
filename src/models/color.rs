@@ -12,6 +12,15 @@ impl Color {
     pub fn new(r: u8, g: u8, b: u8, a: u8) -> Self {
         Self { r, g, b, a }
     }
+
+    pub fn with_alpha(&self, a: u8) -> Self {
+        Self {
+            r: self.r,
+            g: self.g,
+            b: self.b,
+            a,
+        }
+    }
 }
 
 impl From<Color> for SolidSource {

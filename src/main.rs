@@ -1,18 +1,18 @@
 mod exchanges;
-mod graphics;
 mod models;
+mod renderer;
 mod trader;
 
 use crate::exchanges::ExchangeFactory;
-use crate::models::Orders;
+use crate::models::{Log, LogLevel, Orders};
+use crate::renderer::Renderer;
 use crate::trader::Trader;
 use console::Term;
-use graphics::{
-    CandlesRenderer, OrderBookRenderer, OrderFlowRenderer, StatusRenderer, TextRenderer,
-};
+use font_kit::family_name::FamilyName;
+use font_kit::properties::Properties;
+use font_kit::source::SystemSource;
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{ColorSchema, Config, Interval, Layout, LogManager, PxPerTick};
-use raqote::DrawTarget;
+use models::{ColorSchema, Config, Interval, LogManager};
 use rust_decimal::Decimal;
 use std::sync::mpsc;
 
@@ -33,7 +33,7 @@ fn main() {
         config.symbol.clone(),
         200,
         &config,
-        logs_sender,
+        logs_sender.clone(),
         orders_sender,
     )
     .unwrap_or_else(|err| {
@@ -46,15 +46,10 @@ fn main() {
         std::process::exit(1);
     });
 
-    let mut size_range = Decimal::ZERO;
-
-    let mut window_width = config.window_width;
-    let mut window_height = config.window_height;
-
     let mut window = Window::new(
         &format!("{} - {}", symbol.slug, exchange.name()),
-        window_width,
-        window_height,
+        config.window_width,
+        config.window_height,
         WindowOptions {
             resize: true,
             ..WindowOptions::default()
@@ -62,18 +57,6 @@ fn main() {
     )
     .unwrap();
     window.set_target_fps(60);
-
-    let mut dt = DrawTarget::new(window_width as i32, window_height as i32);
-    let mut layout = Layout::new(window_width as i32, window_height as i32);
-    let text_renderer =
-        TextRenderer::new("/System/Library/Fonts/SFNSMono.ttf").unwrap_or_else(|err| {
-            eprintln!("Error loading font: {}", err);
-            std::process::exit(1);
-        });
-    let mut candles_renderer = CandlesRenderer::new(layout.candles_area);
-    let mut order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
-    let mut order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
-    let mut status_renderer = StatusRenderer::new(layout.status_area);
 
     let mut trader = Trader::new(
         symbol.clone(),
@@ -88,8 +71,19 @@ fn main() {
         config.sl_pnl,
     );
 
-    let mut center: Option<Decimal> = None;
-    let mut px_per_tick = PxPerTick::default();
+    let font = SystemSource::new()
+        .select_best_match(&[FamilyName::Monospace], &Properties::new())
+        .unwrap()
+        .load()
+        .unwrap();
+    let mut renderer = Renderer::new(
+        config.window_width,
+        config.window_height,
+        symbol.tick_size,
+        ColorSchema::for_theme(config.theme),
+        font,
+    );
+
     let mut force_redraw = true;
     let mut left_was_pressed = false;
     let mut sl_triggered = false;
@@ -110,46 +104,9 @@ fn main() {
 
         logs_manager.consume();
 
-        // pause recenter if ctrl is pressed
-        if !(center.is_some()
-            && (window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl)))
-        {
-            if trader.bid.is_some() && trader.ask.is_some() {
-                let current_center = Some(
-                    ((trader.bid.unwrap() + trader.ask.unwrap())
-                        / Decimal::from(2)
-                        / symbol.tick_size)
-                        .floor()
-                        * symbol.tick_size,
-                );
-
-                if center.is_some() {
-                    if (center.unwrap() - current_center.unwrap()).abs() / symbol.tick_size
-                        * px_per_tick.get()
-                        >= Decimal::from(window_height / 4)
-                    {
-                        center = current_center;
-                    }
-                } else {
-                    center = current_center;
-                }
-            }
-        }
-
-        let (new_width, new_height) = window.get_size();
-        if new_width != window_width || new_height != window_height {
-            window_width = new_width;
-            window_height = new_height;
-
-            dt = DrawTarget::new(window_width as i32, window_height as i32);
-            layout = Layout::new(window_width as i32, window_height as i32);
-            candles_renderer = CandlesRenderer::new(layout.candles_area);
-            order_book_renderer = OrderBookRenderer::new(layout.order_book_area);
-            order_flow_renderer = OrderFlowRenderer::new(layout.order_flow_area);
-            status_renderer = StatusRenderer::new(layout.status_area);
-
-            force_redraw = true;
-        }
+        let ctrl_pressed = window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl);
+        let shift_pressed =
+            window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift);
 
         if window.is_key_pressed(Key::Key1, minifb::KeyRepeat::No) {
             trader.set_size_multiplier_index(0);
@@ -191,67 +148,48 @@ fn main() {
             }
         }
 
-        if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
-            px_per_tick.scale_out();
-            size_range = Decimal::ZERO;
+        if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No) && shift_pressed {
+            renderer.scale_out();
             force_redraw = true;
         }
 
-        if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
-            px_per_tick.scale_in();
-            size_range = Decimal::ZERO;
+        if window.is_key_pressed(Key::Down, minifb::KeyRepeat::No) && shift_pressed {
+            renderer.scale_in();
             force_redraw = true;
         }
 
-        if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
+        if window.is_key_pressed(Key::Right, minifb::KeyRepeat::No) && shift_pressed {
             let new_interval = interval.up();
             if new_interval != interval {
                 interval = new_interval;
                 exchange.set_interval(new_interval);
-                center = None;
                 force_redraw = true;
             }
         }
 
-        if window.is_key_pressed(Key::Left, minifb::KeyRepeat::No)
-            && (window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift))
-        {
+        if window.is_key_pressed(Key::Left, minifb::KeyRepeat::No) && shift_pressed {
             let new_interval = interval.down();
             if new_interval != interval {
                 interval = new_interval;
                 exchange.set_interval(new_interval);
-                center = None;
                 force_redraw = true;
             }
         }
 
         let left_pressed = window.get_mouse_down(MouseButton::Left);
-        if left_pressed && !left_was_pressed {
+        if left_pressed && !left_was_pressed && ctrl_pressed {
             if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
-                if window.is_key_down(Key::LeftCtrl) || window.is_key_down(Key::RightCtrl) {
-                    if let Some(center_price) = center {
-                        let price = (Decimal::from(layout.candles_area.height / 2 - y as i32)
-                            / px_per_tick.get())
-                        .floor()
-                            * symbol.tick_size
-                            + center_price;
-                        if window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift)
-                        {
-                            if let Some(new_order) = trader.limit(price) {
-                                exchange.place_order(new_order);
-                            }
-                        } else {
-                            if let Some(new_order) = trader.stop(price) {
-                                exchange.place_order(new_order);
-                            }
-                        };
-                    }
+                let price = renderer.px_to_price(y as i32);
+                if price > Decimal::ZERO {
+                    if shift_pressed {
+                        if let Some(new_order) = trader.limit(price) {
+                            exchange.place_order(new_order);
+                        }
+                    } else {
+                        if let Some(new_order) = trader.stop(price) {
+                            exchange.place_order(new_order);
+                        }
+                    };
                 }
             }
         }
@@ -268,58 +206,28 @@ fn main() {
                 if trader.get_pnl() < -sl_pnl.abs() {
                     sl_triggered = true;
                     trader.flat();
+                    logs_sender
+                        .send(Log::new(
+                            LogLevel::Error("SL".to_string()),
+                            format!("Stop-loss triggered at pnl: {:.2}", trader.get_pnl()),
+                        ))
+                        .unwrap()
                 }
             }
         }
 
-        let color_schema = ColorSchema::for_theme(config.theme);
-
-        if let Some(center_price) = center {
-            candles_renderer.render(
-                shared_state.candles.read().unwrap(),
-                shared_state.open_interest.read().unwrap(),
-                &mut dt,
-                &text_renderer,
-                &color_schema,
-                symbol.tick_size,
-                center_price,
-                px_per_tick.get(),
-                trader.get_open_orders(),
-                trader.get_last_closed_order(),
-                trader.get_sl_price(),
-                force_redraw,
-            );
-            order_book_renderer.render(
-                shared_state.order_book.read().unwrap(),
-                &mut dt,
-                &color_schema,
-                symbol.tick_size,
-                center_price,
-                px_per_tick.get(),
-                &mut size_range,
-                force_redraw,
-            );
-            order_flow_renderer.render(
-                shared_state.order_flow.read().unwrap(),
-                &mut dt,
-                &color_schema,
-                symbol.tick_size,
-                center_price,
-                px_per_tick.get(),
-                &mut size_range,
-                force_redraw,
-            );
-        }
-        status_renderer.render(
-            interval,
-            &mut dt,
-            &text_renderer,
-            &color_schema,
+        let (window_width, window_height) = window.get_size();
+        renderer.set_size(window_width, window_height);
+        renderer.render(
+            &shared_state,
             &trader,
-            &logs_manager.status(),
+            logs_manager.status(),
+            interval,
+            ctrl_pressed,
+            force_redraw,
         );
 
-        let pixels_buffer: Vec<u32> = dt.get_data().iter().map(|&pixel| pixel).collect();
+        let pixels_buffer: Vec<u32> = renderer.to_pixes_buffer();
         window
             .update_with_buffer(&pixels_buffer, window_width, window_height)
             .unwrap();

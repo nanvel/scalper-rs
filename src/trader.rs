@@ -41,7 +41,9 @@ impl Trader {
         }
 
         if let Some(bid) = self.bid {
-            Some(self.symbol.tune_quantity(self.size_quote / bid, bid))
+            let single_size = self.symbol.tune_quantity(self.size_quote / bid, bid);
+            self.size_base = Some(single_size);
+            Some(single_size)
         } else {
             None
         }
