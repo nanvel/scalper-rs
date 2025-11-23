@@ -139,11 +139,11 @@ impl Renderer {
         let order_flow_updated = shared_state.order_flow.read().unwrap().updated;
 
         if self.candles_updated != candles_updated || self.force_redraw {
+            self.draw_orders(trader, price);
             self.draw_candles(
                 &shared_state.candles.read().unwrap(),
                 &shared_state.open_interest.read().unwrap(),
             );
-            self.draw_orders(trader, price);
             self.candles_updated = candles_updated;
         }
 
@@ -882,7 +882,7 @@ impl Renderer {
                     .unwrap_or(0);
                 let oi_top = (area.top + area.height) - oi_height;
                 let mut pb = PathBuilder::new();
-                pb.rect((area.width - 3) as f32, oi_top as f32, 2., oi_height as f32);
+                pb.rect(area.width as f32, oi_top as f32, 2., oi_height as f32);
                 let path = pb.finish();
                 self.dt.fill(
                     &path,
