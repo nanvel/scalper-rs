@@ -1,6 +1,6 @@
 use crate::models::{
-    CandlesState, ColorSchema, Layout, OpenInterestState, OrderBookState, SharedState, Status,
-    Timestamp,
+    CandlesState, ColorSchema, Layout, OpenInterestState, OrderBookState, OrderFlowState,
+    SharedState, Status, Timestamp,
 };
 use crate::trader::Trader;
 use raqote::{
@@ -25,6 +25,7 @@ pub struct Renderer {
     color_schema: ColorSchema,
     candles_updated: Timestamp,
     order_book_updated: Timestamp,
+    order_flow_updated: Timestamp,
     force_redraw: bool,
 }
 
@@ -41,6 +42,7 @@ impl Renderer {
             color_schema,
             candles_updated: Timestamp::from(0),
             order_book_updated: Timestamp::from(0),
+            order_flow_updated: Timestamp::from(0),
             force_redraw: true,
         }
     }
@@ -135,7 +137,141 @@ impl Renderer {
             self.order_book_updated = order_book_updated;
         }
 
+        if self.order_flow_updated != order_flow_updated || self.force_redraw {
+            self.draw_order_flow(&shared_state.order_flow.read().unwrap());
+            self.order_flow_updated = order_flow_updated;
+        }
+
         self.force_redraw = false;
+    }
+
+    fn draw_order_flow(&mut self, order_flow_state: &OrderFlowState) {
+        let area = self.layout.order_flow_area;
+
+        self.dt.fill_rect(
+            area.left as f32,
+            area.top as f32,
+            area.width as f32,
+            area.height as f32,
+            &Source::Solid(self.color_schema.background.into()),
+            &DrawOptions::new(),
+        );
+
+        let left = area.left as f32;
+        let right = (area.left + area.width) as f32 - 10_f32;
+        let max_width = Decimal::from((right - left) as u32);
+        let central_point = area.height / 2;
+
+        let mut buy_buckets: Vec<Decimal> = vec![Decimal::ZERO; area.height as usize];
+        let mut sell_buckets: Vec<Decimal> = vec![Decimal::ZERO; area.height as usize];
+
+        for (price, quantity) in order_flow_state.buys.iter() {
+            let price_diff = (self.center_price - *price) / self.tick_size;
+            let px_offset = (price_diff * self.px_per_tick).to_i32().unwrap_or(0);
+            let y = central_point + px_offset;
+            if y < 0 || y >= area.height {
+                continue;
+            }
+            buy_buckets[y as usize] += *quantity;
+        }
+
+        for (price, quantity) in order_flow_state.sells.iter() {
+            let price_diff = (self.center_price - *price) / self.tick_size;
+            let px_offset = (price_diff * self.px_per_tick).to_i32().unwrap_or(0);
+            let y = central_point + px_offset;
+            if y < 0 || y >= area.height {
+                continue;
+            }
+            sell_buckets[y as usize] += *quantity;
+        }
+
+        let max_val = buy_buckets
+            .iter()
+            .cloned()
+            .max()
+            .unwrap_or(Decimal::ZERO)
+            .max(sell_buckets.iter().cloned().max().unwrap_or(Decimal::ZERO))
+            .max(self.book_entry_range);
+
+        if max_val.is_zero() {
+            return;
+        }
+
+        self.book_entry_range = max_val;
+
+        for (i, val) in buy_buckets.iter().enumerate() {
+            if val.is_zero() {
+                continue;
+            }
+            let width = (val / max_val * max_width).to_f32().unwrap_or(0.0);
+            let y = i as f32 + area.top as f32;
+
+            if self.px_per_tick == Decimal::from(3) {
+                self.dt.fill_rect(
+                    left,
+                    y - 1.0,
+                    width,
+                    3.0,
+                    &Source::Solid(self.color_schema.volume_buy.into()),
+                    &DrawOptions::new(),
+                );
+            } else if self.px_per_tick >= Decimal::from(5) {
+                self.dt.fill_rect(
+                    left,
+                    y - (self.px_per_tick.to_f32().unwrap() / 2.0).floor(),
+                    width,
+                    self.px_per_tick.to_f32().unwrap() - 2.0,
+                    &Source::Solid(self.color_schema.volume_buy.into()),
+                    &DrawOptions::new(),
+                );
+            } else {
+                self.dt.fill_rect(
+                    left,
+                    y,
+                    width,
+                    1.0,
+                    &Source::Solid(self.color_schema.volume_buy.into()),
+                    &DrawOptions::new(),
+                );
+            }
+        }
+
+        for (i, val) in sell_buckets.iter().enumerate() {
+            if val.is_zero() {
+                continue;
+            }
+            let width = (val / max_val * max_width).to_f32().unwrap_or(0.0);
+            let y = i as f32 + area.top as f32;
+
+            if self.px_per_tick == Decimal::from(3) {
+                self.dt.fill_rect(
+                    left,
+                    y - 1.0,
+                    width,
+                    3.0,
+                    &Source::Solid(self.color_schema.volume_sell.into()),
+                    &DrawOptions::new(),
+                );
+            } else if self.px_per_tick >= Decimal::from(5) {
+                self.dt.fill_rect(
+                    left,
+                    y - (self.px_per_tick.to_f32().unwrap() / 2.0).floor(),
+                    width,
+                    self.px_per_tick.to_f32().unwrap() - 2.0,
+                    &Source::Solid(self.color_schema.volume_sell.into()),
+                    &DrawOptions::new(),
+                );
+            } else {
+                self.dt.fill_rect(
+                    left,
+                    y,
+                    width,
+                    1.0,
+                    &Source::Solid(self.color_schema.volume_sell.into()),
+                    &DrawOptions::new(),
+                );
+            }
+        }
     }
 
     fn draw_order_book(&mut self, order_book_state: &OrderBookState) {
