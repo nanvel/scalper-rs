@@ -42,12 +42,14 @@ impl Renderer {
         color_schema: ColorSchema,
         font: Font,
     ) -> Self {
+        let layout = Layout::new(width as i32, height as i32);
+        let center_px = ((layout.candles_area.height - 80) / 2) as usize;
         Self {
             dt: DrawTarget::new(width as i32, height as i32),
-            layout: Layout::new(width as i32, height as i32),
+            layout,
             font,
             book_entry_range: Decimal::ZERO,
-            center_px: height / 2,
+            center_px,
             center_price: Decimal::ZERO,
             px_per_tick: Decimal::from(1),
             tick_size,
@@ -66,7 +68,7 @@ impl Renderer {
             self.layout = Layout::new(width, height);
             self.force_redraw = true;
             self.dt = DrawTarget::new(width, height);
-            self.center_px = (height / 2) as usize;
+            self.center_px = ((self.layout.candles_area.height - 80) / 2) as usize;
             self.center_price = Decimal::ZERO;
         }
     }
@@ -169,7 +171,7 @@ impl Renderer {
 
         self.dt.fill_rect(
             area.left as f32,
-            (area.top + area.height - 126) as f32,
+            (area.top + area.height - 106) as f32,
             100_f32,
             20_f32,
             &Source::Solid(self.color_schema.background.into()),
@@ -180,10 +182,7 @@ impl Renderer {
             &self.font,
             (16 * 72 / 96) as f32,
             &now.format("%H:%M:%S UTC").to_string(),
-            Point::new(
-                (area.left + 4) as f32,
-                (area.top + area.height - 112) as f32,
-            ),
+            Point::new((area.left + 4) as f32, (area.top + area.height - 92) as f32),
             &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
         );
@@ -307,12 +306,12 @@ impl Renderer {
 
             let mut pb = PathBuilder::new();
             pb.move_to(area.left as f32 + 3_f32, y as f32);
-            pb.line_to((area.left + area.width) as f32 - 1_f32, y as f32);
+            pb.line_to((area.left + area.width / 2) as f32 - 1_f32, y as f32);
             let path = pb.finish();
 
             self.dt.stroke(
                 &path,
-                &Source::Solid(color.with_alpha(100).into()),
+                &Source::Solid(color.into()),
                 &StrokeStyle {
                     width: 1.0,
                     cap: LineCap::Round,
@@ -735,7 +734,7 @@ impl Renderer {
 
         let candle_width = 15;
         let body_width = 11;
-        let volume_height = 100;
+        let volume_height = 80;
 
         for (i, candle) in candles.iter().rev().enumerate() {
             let x = area.width + area.left - (i as i32) * candle_width - 15;
@@ -878,7 +877,7 @@ impl Renderer {
 
         if max_oi > Decimal::ZERO {
             if !oi_diff.is_zero() {
-                let oi_height = (max_oi / Decimal::from(100) / oi_diff * vh_dec)
+                let oi_height = (max_oi / Decimal::from(volume_height) / oi_diff * vh_dec)
                     .to_i32()
                     .unwrap_or(0);
                 let oi_top = (area.top + area.height) - oi_height;
@@ -917,7 +916,7 @@ impl Renderer {
         // current price
         self.dt.fill_rect(
             (area.left + area.width) as f32 - 60_f32,
-            (area.top + area.height) as f32 - 126_f32,
+            (area.top + area.height) as f32 - 106_f32,
             59_f32,
             20_f32,
             &Source::Solid(self.color_schema.background.into()),
@@ -930,7 +929,7 @@ impl Renderer {
             &to_fixed_string(current_price.to_f64().unwrap(), 8),
             Point::new(
                 (area.left + area.width - 55) as f32,
-                (area.top + area.height) as f32 - 112_f32,
+                (area.top + area.height) as f32 - 92_f32,
             ),
             &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
