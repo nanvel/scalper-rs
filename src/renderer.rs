@@ -142,12 +142,12 @@ impl Renderer {
                 &shared_state.candles.read().unwrap(),
                 &shared_state.open_interest.read().unwrap(),
             );
+            self.draw_orders(trader, price);
             self.candles_updated = candles_updated;
         }
 
         if self.order_book_updated != order_book_updated || self.force_redraw {
             self.draw_order_book(&shared_state.order_book.read().unwrap());
-            self.draw_orders(trader, price);
             self.order_book_updated = order_book_updated;
         }
 
@@ -157,8 +157,35 @@ impl Renderer {
         }
 
         self.draw_status(&status, &interval, trader);
+        self.draw_time();
 
         self.force_redraw = false;
+    }
+
+    fn draw_time(&mut self) {
+        let area = self.layout.candles_area;
+        let now = Utc::now();
+
+        self.dt.fill_rect(
+            area.left as f32,
+            (area.top + area.height - 126) as f32,
+            100_f32,
+            20_f32,
+            &Source::Solid(self.color_schema.background.into()),
+            &DrawOptions::new(),
+        );
+
+        self.dt.draw_text(
+            &self.font,
+            (16 * 72 / 96) as f32,
+            &now.format("%H:%M:%S UTC").to_string(),
+            Point::new(
+                (area.left + 4) as f32,
+                (area.top + area.height - 112) as f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
     }
 
     fn draw_orders(&mut self, trader: &Trader, price: Decimal) {
@@ -249,9 +276,9 @@ impl Renderer {
 
         // current price line
         let mut pb = PathBuilder::new();
-        pb.move_to(area.left as f32, self.price_to_px(price) as f32);
+        pb.move_to(area.left as f32 + 3_f32, self.price_to_px(price) as f32);
         pb.line_to(
-            (area.left + area.width) as f32,
+            (area.left + area.width) as f32 - 1_f32,
             self.price_to_px(price) as f32,
         );
         let path = pb.finish();
@@ -265,18 +292,6 @@ impl Renderer {
                 join: LineJoin::Round,
                 ..Default::default()
             },
-            &DrawOptions::new(),
-        );
-
-        self.dt.draw_text(
-            &self.font,
-            (14 * 72 / 96) as f32,
-            &to_fixed_string(price.to_f64().unwrap(), 8),
-            Point::new(
-                (area.left + 4) as f32,
-                self.price_to_px(price) as f32 + 4_f32,
-            ),
-            &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
         );
 
@@ -388,14 +403,11 @@ impl Renderer {
             &DrawOptions::new(),
         );
 
-        let now = Utc::now();
-
         let left_text = format!(
-            "{} <{} X {}> {} {}",
+            "{} <{} X {}> {}",
             interval.slug(),
             trader.size_quote.to_string(),
             trader.get_size_multiplier().to_string(),
-            now.format("%H:%M:%S UTC").to_string(),
             to_fixed_string(trader.get_lots(), 6),
         );
         self.dt.draw_text(
@@ -824,10 +836,6 @@ impl Renderer {
                     0
                 };
 
-                if oi_height <= 0 {
-                    continue;
-                }
-
                 let bar_top = (area.top + area.height) - bar_height;
                 let bar_left = x - (body_width / 2);
 
@@ -843,15 +851,17 @@ impl Renderer {
                 self.dt
                     .fill(&path, &Source::Solid(vol_color), &DrawOptions::new());
 
-                let oi_top = (area.top + area.height) - oi_height;
-                let mut pb = PathBuilder::new();
-                pb.rect((bar_left + 6) as f32, oi_top as f32, 3., oi_height as f32);
-                let path = pb.finish();
-                self.dt.fill(
-                    &path,
-                    &Source::Solid(self.color_schema.open_interest.into()),
-                    &DrawOptions::new(),
-                );
+                if oi_height > 0 {
+                    let oi_top = (area.top + area.height) - oi_height;
+                    let mut pb = PathBuilder::new();
+                    pb.rect((bar_left + 6) as f32, oi_top as f32, 3., oi_height as f32);
+                    let path = pb.finish();
+                    self.dt.fill(
+                        &path,
+                        &Source::Solid(self.color_schema.open_interest.into()),
+                        &DrawOptions::new(),
+                    );
+                }
             }
         }
 
@@ -876,7 +886,7 @@ impl Renderer {
         let mut pb = PathBuilder::new();
         pb.move_to(area.left as f32, self.price_to_px(current_price) as f32);
         pb.line_to(
-            (area.left + area.width) as f32,
+            (area.left + area.width) as f32 - 1_f32,
             self.price_to_px(current_price) as f32,
         );
         let path = pb.finish();
@@ -890,6 +900,28 @@ impl Renderer {
                 join: LineJoin::Round,
                 ..Default::default()
             },
+            &DrawOptions::new(),
+        );
+
+        // current price
+        self.dt.fill_rect(
+            (area.left + area.width) as f32 - 60_f32,
+            (area.top + area.height) as f32 - 126_f32,
+            59_f32,
+            20_f32,
+            &Source::Solid(self.color_schema.background.into()),
+            &DrawOptions::new(),
+        );
+
+        self.dt.draw_text(
+            &self.font,
+            (16 * 72 / 96) as f32,
+            &to_fixed_string(current_price.to_f64().unwrap(), 8),
+            Point::new(
+                (area.left + area.width - 55) as f32,
+                (area.top + area.height) as f32 - 112_f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
         );
     }
