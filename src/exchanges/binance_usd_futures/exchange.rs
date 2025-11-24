@@ -14,7 +14,7 @@ use tokio::runtime;
 use tokio::sync::oneshot;
 use tokio::time::sleep;
 
-pub struct BinanceFuturesExchange {
+pub struct BinanceUSDFuturesExchange {
     name: &'static str,
     symbol: String,
     candles_limit: usize,
@@ -26,7 +26,7 @@ pub struct BinanceFuturesExchange {
     handle: Option<thread::JoinHandle<()>>,
 }
 
-impl Exchange for BinanceFuturesExchange {
+impl Exchange for BinanceUSDFuturesExchange {
     fn name(&self) -> &str {
         self.name
     }
@@ -190,7 +190,7 @@ impl Exchange for BinanceFuturesExchange {
     }
 }
 
-impl BinanceFuturesExchange {
+impl BinanceUSDFuturesExchange {
     pub fn new(
         symbol: String,
         candles_limit: usize,

@@ -1,6 +1,7 @@
 use super::base::errors::ExchangeError;
 use super::base::exchange::Exchange;
-use super::binance_usdt_futures::BinanceFuturesExchange;
+use super::binance_spot::BinanceSpotExchange;
+use super::binance_usd_futures::BinanceUSDFuturesExchange;
 use crate::models::Config;
 use crate::models::{Log, Order};
 use std::sync::mpsc::Sender;
@@ -17,7 +18,15 @@ impl ExchangeFactory {
         orders_sender: Sender<Order>,
     ) -> Result<Box<dyn Exchange>, ExchangeError> {
         match name {
-            "binance_usd_futures" => Ok(Box::new(BinanceFuturesExchange::new(
+            "binance_usd_futures" => Ok(Box::new(BinanceUSDFuturesExchange::new(
+                symbol,
+                candles_limit,
+                orders_sender,
+                logs_sender,
+                config.binance_access_key.clone(),
+                config.binance_secret_key.clone(),
+            ))),
+            "binance_spot" => Ok(Box::new(BinanceSpotExchange::new(
                 symbol,
                 candles_limit,
                 orders_sender,
