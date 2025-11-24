@@ -7,7 +7,7 @@ use crate::models::{
     CandlesState, Interval, Log, LogLevel, NewOrder, OpenInterestState, Order, OrderBookState,
     OrderFlowState, SharedCandlesState, SharedState, Symbol,
 };
-use std::sync::{Arc, RwLock, mpsc, mpsc::Receiver, mpsc::Sender};
+use std::sync::{Arc, RwLock, mpsc::Sender};
 use std::thread;
 use std::time::Duration;
 use tokio::runtime;

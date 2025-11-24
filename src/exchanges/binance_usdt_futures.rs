@@ -1,6 +1,4 @@
-mod auth;
 mod client;
-mod errors;
 mod exchange;
 mod market_stream;
 mod open_interest_stream;

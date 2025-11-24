@@ -1,7 +1,7 @@
 use super::base::errors::ExchangeError;
 use super::base::exchange::Exchange;
-use super::binance_futures::BinanceFuturesExchange;
-use crate::models::{Config, Interval};
+use super::binance_usdt_futures::BinanceFuturesExchange;
+use crate::models::Config;
 use crate::models::{Log, Order};
 use std::sync::mpsc::Sender;
 

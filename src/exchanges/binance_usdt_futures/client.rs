@@ -1,6 +1,6 @@
-use super::auth::{build_signed_query, get_timestamp};
-use super::errors::{BinanceError, Result};
 use crate::exchanges::base::USER_AGENT;
+use crate::exchanges::binance_base::auth::{build_signed_query, get_timestamp};
+use crate::exchanges::binance_base::errors::{BinanceError, Result};
 use crate::models::{
     Candle, NewOrder, Order, OrderSide, OrderStatus, OrderType, Symbol, Timestamp,
 };
