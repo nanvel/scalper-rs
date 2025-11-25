@@ -436,7 +436,6 @@ impl Renderer {
         let left = area.left as f32;
         let right = (area.left + area.width) as f32 - 10_f32;
         let max_width = Decimal::from((right - left) as u32);
-        let central_point = area.height / 2;
 
         let mut buy_buckets: Vec<Decimal> = vec![Decimal::ZERO; area.height as usize];
         let mut sell_buckets: Vec<Decimal> = vec![Decimal::ZERO; area.height as usize];
@@ -444,7 +443,7 @@ impl Renderer {
         for (price, quantity) in order_flow_state.buys.iter() {
             let price_diff = (self.center_price - *price) / self.tick_size;
             let px_offset = (price_diff * self.px_per_tick).to_i32().unwrap_or(0);
-            let y = central_point + px_offset;
+            let y = self.center_px as i32 + px_offset;
             if y < 0 || y >= area.height {
                 continue;
             }
@@ -454,7 +453,7 @@ impl Renderer {
         for (price, quantity) in order_flow_state.sells.iter() {
             let price_diff = (self.center_price - *price) / self.tick_size;
             let px_offset = (price_diff * self.px_per_tick).to_i32().unwrap_or(0);
-            let y = central_point + px_offset;
+            let y = self.center_px as i32 + px_offset;
             if y < 0 || y >= area.height {
                 continue;
             }
