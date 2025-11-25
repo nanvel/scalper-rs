@@ -140,11 +140,14 @@ impl Renderer {
         let order_book_updated = shared_state.order_book.read().unwrap().updated;
         let order_flow_updated = shared_state.order_flow.read().unwrap().updated;
 
+        let scale_step = self.scale_step();
+
         if self.candles_updated != candles_updated || self.force_redraw {
-            self.draw_orders(trader, price);
+            self.draw_orders(trader, price, scale_step);
             self.draw_candles(
                 &shared_state.candles.read().unwrap(),
                 &shared_state.open_interest.read().unwrap(),
+                scale_step,
             );
             self.candles_updated = candles_updated;
         }
@@ -191,7 +194,7 @@ impl Renderer {
         );
     }
 
-    fn draw_orders(&mut self, trader: &Trader, price: Decimal) {
+    fn draw_orders(&mut self, trader: &Trader, price: Decimal, scale_step: Decimal) {
         let area = self.layout.orders_area;
 
         self.dt.fill_rect(
@@ -203,27 +206,8 @@ impl Renderer {
             &DrawOptions::new(),
         );
 
-        let mut pb = PathBuilder::new();
-        pb.rect(area.left as f32, area.top as f32, 2.0, area.height as f32);
-        let path = pb.finish();
-
-        self.dt.fill(
-            &path,
-            &Source::Solid(self.color_schema.border.into()),
-            &DrawOptions::new(),
-        );
-
         // scale
-        let visible_ticks = (area.height as f64) / self.px_per_tick.to_f64().unwrap();
-        let mut m = 1;
-        while visible_ticks / m.to_f64().unwrap() > 10.0 {
-            m *= 10;
-        }
-        if visible_ticks / m.to_f64().unwrap() > 4. {
-            m *= 2;
-        }
-        let m = Decimal::from(m) * self.tick_size;
-        let tick_price = (self.center_price / m).floor() * m;
+        let tick_price = (self.center_price / scale_step).floor() * scale_step;
 
         self.dt.draw_text(
             &self.font,
@@ -237,24 +221,8 @@ impl Renderer {
             &DrawOptions::new(),
         );
 
-        let mut pb = PathBuilder::new();
-        let delta = tick_price / Decimal::from(100);
-        pb.rect(
-            area.left as f32,
-            self.price_to_px(tick_price + delta) as f32,
-            2.0,
-            (self.price_to_px(tick_price) - self.price_to_px(tick_price + delta)) as f32,
-        );
-        let path = pb.finish();
-
-        self.dt.fill(
-            &path,
-            &Source::Solid(self.color_schema.scale_bar.into()),
-            &DrawOptions::new(),
-        );
-
-        for i in 1..3 {
-            let tp = tick_price + m * Decimal::from(i);
+        for i in 1..5 {
+            let tp = tick_price + scale_step * Decimal::from(i);
             self.dt.draw_text(
                 &self.font,
                 (14 * 72 / 96) as f32,
@@ -265,8 +233,8 @@ impl Renderer {
             );
         }
 
-        for i in 1..3 {
-            let tp = tick_price - m * Decimal::from(i);
+        for i in 1..5 {
+            let tp = tick_price - scale_step * Decimal::from(i);
             self.dt.draw_text(
                 &self.font,
                 (14 * 72 / 96) as f32,
@@ -717,6 +685,7 @@ impl Renderer {
         &mut self,
         candles_state: &CandlesState,
         open_interest_state: &OpenInterestState,
+        scale_step: Decimal,
     ) {
         let area = self.layout.candles_area;
         self.dt.fill_rect(
@@ -937,6 +906,72 @@ impl Renderer {
             &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
         );
+
+        // scale
+        let mut pb = PathBuilder::new();
+        pb.rect(
+            (area.left + area.width) as f32,
+            area.top as f32,
+            2.0,
+            area.height as f32,
+        );
+        let path = pb.finish();
+
+        self.dt.fill(
+            &path,
+            &Source::Solid(self.color_schema.border.into()),
+            &DrawOptions::new(),
+        );
+
+        let scale_start = (self.center_price / scale_step).floor() * scale_step;
+        let delta = scale_start / Decimal::from(100);
+        let mut pos = scale_start;
+        loop {
+            let mut pb = PathBuilder::new();
+            let start_px = self.price_to_px(pos) as f32;
+            if start_px < 0_f32 {
+                break;
+            }
+            pb.rect(
+                (area.left + area.width) as f32,
+                start_px,
+                2.0,
+                self.price_to_px(pos + delta) as f32 - start_px,
+            );
+            let path = pb.finish();
+
+            self.dt.fill(
+                &path,
+                &Source::Solid(self.color_schema.scale_bar.into()),
+                &DrawOptions::new(),
+            );
+
+            pos += delta * Decimal::from(2);
+        }
+
+        pos = scale_start;
+        loop {
+            let mut pb = PathBuilder::new();
+            let start_px = self.price_to_px(pos) as f32;
+            if start_px > (area.height + area.top) as f32 {
+                break;
+            }
+            pb.rect(
+                (area.left + area.width) as f32,
+                start_px,
+                2.0,
+                start_px - self.price_to_px(pos - delta) as f32,
+            );
+            let path = pb.finish();
+
+            self.dt.fill(
+                &path,
+                &Source::Solid(self.color_schema.scale_bar.into()),
+                &DrawOptions::new(),
+            );
+
+            pos -= delta * Decimal::from(2);
+        }
     }
 
     fn adjust_center(&mut self, price: Decimal) {
@@ -950,5 +985,22 @@ impl Renderer {
 
     pub fn to_pixes_buffer(&self) -> Vec<u32> {
         self.dt.get_data().iter().map(|&pixel| pixel).collect()
+    }
+
+    fn scale_step(&self) -> Decimal {
+        let visible_ticks = (Decimal::from(self.layout.candles_area.height) / self.px_per_tick)
+            .to_f32()
+            .unwrap();
+        let mut m = 1_f32;
+        while visible_ticks / m > 50_f32 {
+            m *= 10_f32;
+        }
+        if visible_ticks / m > 20_f32 {
+            m *= 5_f32;
+        }
+        if visible_ticks / m > 8_f32 {
+            m *= 2_f32;
+        }
+        Decimal::from(m as i32) * self.tick_size
     }
 }

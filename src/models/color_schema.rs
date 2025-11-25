@@ -78,7 +78,7 @@ impl ColorSchema {
             // UI elements
             border: Color::new(55, 65, 81, 255),       // #374151
             crosshair: Color::new(156, 163, 175, 255), // #9CA3AF
-            scale_bar: Color::new(139, 92, 246, 255),  // #8B5CF6
+            scale_bar: Color::new(31, 41, 55, 255),    // #1F2937
             sl_line: Color::new(220, 38, 38, 255),     // #DC2626
 
             // status
@@ -119,7 +119,7 @@ impl ColorSchema {
             // UI elements
             border: Color::new(229, 231, 235, 255), // #E5E7EB
             crosshair: Color::new(107, 114, 128, 255), // #6B7280
-            scale_bar: Color::new(139, 92, 246, 255), // #8B5CF6
+            scale_bar: Color::new(107, 114, 128, 255), // #6B7280
             sl_line: Color::new(220, 38, 38, 255),  // #DC2626
 
             // status
