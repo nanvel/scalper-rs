@@ -33,6 +33,15 @@ impl OrderFlowState {
             self.sells.get(&price).unwrap_or(&Decimal::ZERO) + quantity,
         );
     }
+
+    pub fn get_balance(&self) -> Decimal {
+        let total_buy: Decimal = self.buys.values().cloned().sum();
+        let total_sell: Decimal = self.sells.values().cloned().sum();
+        if (total_buy + total_sell) == Decimal::ZERO {
+            return Decimal::from(50) / Decimal::from(100);
+        }
+        total_buy / (total_buy + total_sell)
+    }
 }
 
 pub type SharedOrderFlowState = Arc<RwLock<OrderFlowState>>;

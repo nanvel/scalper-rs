@@ -32,6 +32,8 @@ pub struct Renderer {
     order_book_updated: Timestamp,
     order_flow_updated: Timestamp,
     force_redraw: bool,
+    balance: [Option<Decimal>; 100],
+    balance_ts: Timestamp,
 }
 
 impl Renderer {
@@ -58,6 +60,8 @@ impl Renderer {
             order_book_updated: Timestamp::from(0),
             order_flow_updated: Timestamp::from(0),
             force_redraw: true,
+            balance: [None; 100],
+            balance_ts: Timestamp::now(),
         }
     }
 
@@ -158,7 +162,19 @@ impl Renderer {
         }
 
         if self.order_flow_updated != order_flow_updated || self.force_redraw {
-            self.draw_order_flow(&shared_state.order_flow.read().unwrap());
+            {
+                let order_flow_state = shared_state.order_flow.read().unwrap();
+                let balance = order_flow_state.get_balance();
+                if order_flow_state.updated.seconds() / 60 > self.balance_ts.seconds() / 60 {
+                    for i in (1..self.balance.len()).rev() {
+                        self.balance[i] = self.balance[i - 1];
+                    }
+                    self.balance[0] = Some(balance);
+                    self.balance_ts = order_flow_updated;
+                }
+                self.draw_order_flow(&order_flow_state);
+                self.draw_order_flow_balance(balance);
+            }
             self.order_flow_updated = order_flow_updated;
         }
 
@@ -428,7 +444,7 @@ impl Renderer {
             area.left as f32,
             area.top as f32,
             area.width as f32,
-            area.height as f32,
+            (area.height - self.layout.volume_height) as f32,
             &Source::Solid(self.color_schema.background.into()),
             &DrawOptions::new(),
         );
@@ -543,6 +559,76 @@ impl Renderer {
                     width,
                     1.0,
                     &Source::Solid(self.color_schema.volume_sell.into()),
+                    &DrawOptions::new(),
+                );
+            }
+        }
+    }
+
+    fn draw_order_flow_balance(&mut self, balance: Decimal) {
+        let area = self.layout.order_flow_area;
+        let height = self.layout.volume_height;
+
+        self.dt.fill_rect(
+            area.left as f32,
+            (area.top + area.height - height) as f32,
+            area.width as f32,
+            height as f32,
+            &Source::Solid(self.color_schema.background.into()),
+            &DrawOptions::new(),
+        );
+
+        self.dt.fill_rect(
+            area.left as f32,
+            (area.top + area.height - height) as f32,
+            area.width as f32,
+            1.,
+            &Source::Solid(self.color_schema.border.into()),
+            &DrawOptions::new(),
+        );
+
+        self.dt.fill_rect(
+            (area.left + (area.width / 2)) as f32,
+            (area.top + area.height - height) as f32,
+            1.,
+            height as f32 - 6_f32,
+            &Source::Solid(self.color_schema.border.into()),
+            &DrawOptions::new(),
+        );
+
+        let width = area.width as f32 * balance.to_f32().unwrap();
+        self.dt.fill_rect(
+            area.left as f32,
+            (area.top + area.height - 5) as f32,
+            width - 1_f32,
+            5.,
+            &Source::Solid(self.color_schema.bid_bar.into()),
+            &DrawOptions::new(),
+        );
+        self.dt.fill_rect(
+            area.left as f32 + width + 1_f32,
+            (area.top + area.height - 5) as f32,
+            area.width as f32 - width - 1_f32,
+            5.,
+            &Source::Solid(self.color_schema.ask_bar.into()),
+            &DrawOptions::new(),
+        );
+
+        let limit = (height - 8) / 3;
+        for (i, bal) in self.balance.iter().enumerate().take(limit as usize) {
+            if let Some(bal) = bal {
+                let width = area.width as f32 * bal.to_f32().unwrap();
+                let color = if *bal > (Decimal::from_str("0.5").unwrap()) {
+                    self.color_schema.bid_bar
+                } else {
+                    self.color_schema.ask_bar
+                };
+                self.dt.fill_rect(
+                    area.left as f32 + width - 1_f32,
+                    (area.top + area.height) as f32 - 8_f32 - (i as f32 * 3.0),
+                    3_f32,
+                    2.,
+                    &Source::Solid(color.into()),
                     &DrawOptions::new(),
                 );
             }
