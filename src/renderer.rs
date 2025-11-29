@@ -792,8 +792,9 @@ impl Renderer {
         let candle_width = 15;
         let body_width = 11;
         let volume_height = self.layout.volume_height;
+        let limit = area.width / candle_width;
 
-        for (i, candle) in candles.iter().rev().enumerate() {
+        for (i, candle) in candles.iter().rev().enumerate().take(limit as usize) {
             let x = area.width + area.left - (i as i32) * candle_width - 15;
 
             let open_y = self.price_to_px(candle.open);
@@ -845,7 +846,7 @@ impl Renderer {
         let mut max_volume = Decimal::ZERO;
         let mut max_oi = Decimal::ZERO;
         let mut min_oi = Decimal::MAX;
-        for c in &candles {
+        for c in candles.iter().rev().take(limit as usize) {
             if c.volume > max_volume {
                 max_volume = c.volume;
             }
@@ -859,7 +860,6 @@ impl Renderer {
                 min_oi = oi;
             }
         }
-        let oi_diff = max_oi - min_oi;
 
         self.dt.fill_rect(
             area.left as f32,
@@ -872,7 +872,7 @@ impl Renderer {
 
         self.dt.fill_rect(
             area.left as f32,
-            (area.height - volume_height - 5) as f32,
+            (area.top + area.height - volume_height - 5) as f32,
             area.width as f32,
             1.,
             &Source::Solid(self.color_schema.border.into()),
@@ -880,8 +880,9 @@ impl Renderer {
         );
 
         let vh_dec = Decimal::from(volume_height);
+        let oi_diff = max_oi - min_oi;
         if max_volume > Decimal::ZERO {
-            for (i, candle) in candles.iter().rev().enumerate() {
+            for (i, candle) in candles.iter().rev().enumerate().take(limit as usize) {
                 let x = area.width + area.left - (i as i32) * candle_width - 15;
 
                 // Compute bar height proportional to volume
@@ -929,23 +930,6 @@ impl Renderer {
                         &DrawOptions::new(),
                     );
                 }
-            }
-        }
-
-        if max_oi > Decimal::ZERO {
-            if !oi_diff.is_zero() {
-                let oi_height = (max_oi / Decimal::from(volume_height) / oi_diff * vh_dec)
-                    .to_i32()
-                    .unwrap_or(0);
-                let oi_top = (area.top + area.height) - oi_height;
-                let mut pb = PathBuilder::new();
-                pb.rect(area.width as f32, oi_top as f32, 2., oi_height as f32);
-                let path = pb.finish();
-                self.dt.fill(
-                    &path,
-                    &Source::Solid(self.color_schema.scale_bar.into()),
-                    &DrawOptions::new(),
-                );
             }
         }
 
@@ -1056,6 +1040,46 @@ impl Renderer {
             );
 
             pos -= delta * Decimal::from(2);
+        }
+
+        // oi scale
+        let mut pb = PathBuilder::new();
+        pb.rect(
+            (area.left + area.width) as f32,
+            (area.top + area.height - volume_height - 5) as f32,
+            2.0,
+            volume_height as f32 + 5_f32,
+        );
+        let path = pb.finish();
+
+        self.dt.fill(
+            &path,
+            &Source::Solid(self.color_schema.border.into()),
+            &DrawOptions::new(),
+        );
+
+        if max_oi > Decimal::ZERO {
+            if !oi_diff.is_zero() {
+                let oi_height = ((max_oi / Decimal::from(100) / oi_diff)
+                    * Decimal::from(volume_height))
+                .to_i32()
+                .unwrap_or(0)
+                .min(volume_height);
+                let oi_top = (area.top + area.height) - oi_height;
+                let mut pb = PathBuilder::new();
+                pb.rect(
+                    (area.left + area.width) as f32,
+                    oi_top as f32,
+                    2.,
+                    oi_height as f32,
+                );
+                let path = pb.finish();
+                self.dt.fill(
+                    &path,
+                    &Source::Solid(self.color_schema.scale_bar.into()),
+                    &DrawOptions::new(),
+                );
+            }
         }
     }
 
