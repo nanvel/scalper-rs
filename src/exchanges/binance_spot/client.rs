@@ -1,9 +1,7 @@
 use crate::exchanges::base::USER_AGENT;
 use crate::exchanges::binance_base::auth::{build_signed_query, get_timestamp};
 use crate::exchanges::binance_base::errors::{BinanceError, Result};
-use crate::models::{
-    Candle, NewOrder, Order, OrderSide, OrderStatus, OrderType, Symbol, Timestamp,
-};
+use crate::models::{Candle, Symbol, Timestamp};
 use reqwest::{Client, Response};
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -332,120 +330,6 @@ impl BinanceClient {
 
         Ok(result)
     }
-
-    // === Private API endpoints (require authentication) ===
-
-    pub async fn place_order(&self, order: NewOrder) -> Result<Order> {
-        let order_side = match order.order_side {
-            OrderSide::Buy => "BUY",
-            OrderSide::Sell => "SELL",
-        };
-        let order_type = match order.order_type {
-            OrderType::Market => "MARKET",
-            OrderType::Limit => "LIMIT",
-            OrderType::Stop => "STOP_MARKET",
-        };
-
-        let mut params = vec![
-            ("symbol", self.symbol.clone()),
-            ("side", order_side.to_string()),
-            ("type", order_type.to_string()),
-            ("quantity", order.quantity.to_string()),
-            ("newOrderRespType", "RESULT".to_string()),
-        ];
-
-        if order.order_type == OrderType::Limit {
-            params.push(("price", order.price.unwrap().to_string()));
-        } else if order.order_type == OrderType::Stop {
-            params.push(("stopPrice", order.price.unwrap().to_string()));
-        }
-
-        if matches!(order.order_type, OrderType::Limit) {
-            params.push(("timeInForce", "GTC".to_string()));
-        };
-
-        let resp: BinanceOrder = self.post_signed("/api/v3/order", params).await?;
-
-        let order_status = match resp.status.as_str() {
-            "NEW" => OrderStatus::Pending,
-            "PARTIALLY_FILLED" => OrderStatus::Pending,
-            _ => OrderStatus::Filled,
-        };
-
-        Ok(Order {
-            id: resp.order_id.to_string(),
-            order_type: order.order_type.clone(),
-            order_side: order.order_side,
-            order_status,
-            quantity: resp.orig_qty,
-            executed_quantity: resp.executed_qty,
-            price: match &order.order_type {
-                OrderType::Stop => resp.stop_price.unwrap_or(resp.price),
-                _ => resp.price,
-            },
-            average_price: resp.get_avg_price(),
-            commission: resp.commission(),
-            timestamp: Timestamp::from_milliseconds(resp.get_timestamp()),
-            is_update: false,
-        })
-    }
-
-    pub fn place_order_sync(&self, order: NewOrder) -> Result<Order> {
-        self.runtime.block_on(self.place_order(order))
-    }
-
-    pub async fn cancel_order(&self, order_id: &str) -> Result<Order> {
-        let params = vec![
-            ("symbol", self.symbol.clone()),
-            ("orderId", order_id.to_string()),
-        ];
-        let resp: BinanceOrder = self.delete_signed("/api/v3/order", params).await?;
-
-        let order_type = match resp.order_type.as_str() {
-            "MARKET" => OrderType::Market,
-            "LIMIT" => OrderType::Limit,
-            "STOP_MARKET" => OrderType::Stop,
-            _ => return Err(BinanceError::ParseError("Unknown order type".to_string())),
-        };
-
-        let order_side = match resp.order_side.as_str() {
-            "BUY" => OrderSide::Buy,
-            "SELL" => OrderSide::Sell,
-            _ => return Err(BinanceError::ParseError("Unknown order side".to_string())),
-        };
-
-        Ok(Order {
-            id: resp.order_id.to_string(),
-            order_type: order_type.clone(),
-            order_side: order_side,
-            order_status: OrderStatus::Filled,
-            quantity: resp.orig_qty,
-            executed_quantity: resp.executed_qty,
-            price: match order_type {
-                OrderType::Stop => resp.stop_price.unwrap_or(resp.price),
-                _ => resp.price,
-            },
-            average_price: resp.get_avg_price(),
-            commission: resp.commission(),
-            timestamp: Timestamp::from_milliseconds(resp.get_timestamp()),
-            is_update: false,
-        })
-    }
-
-    pub fn cancel_order_sync(&self, order_id: &str) -> Result<Order> {
-        self.runtime.block_on(self.cancel_order(order_id))
-    }
-
-    pub async fn create_listen_key(&self) -> Result<String> {
-        let listen_key_resp: ListenKey = self.post_with_api_key("/api/v3/userDataStream").await?;
-        Ok(listen_key_resp.listen_key)
-    }
-
-    pub async fn refresh_listen_key(&self) -> Result<()> {
-        self.put_with_api_key::<ListenKey>("/api/v3/userDataStream")
-            .await?;
-        Ok(())
-    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -486,62 +370,6 @@ pub enum Filter {
     },
     #[serde(other)]
     Other,
-}
-
-#[derive(Deserialize)]
-pub struct BinanceOrder {
-    #[serde(rename = "orderId")]
-    pub order_id: u64,
-    pub price: Decimal,
-    #[serde(rename = "stopPrice", default)]
-    pub stop_price: Option<Decimal>,
-    #[serde(rename = "origQty")]
-    pub orig_qty: Decimal,
-    #[serde(rename = "executedQty")]
-    pub executed_qty: Decimal,
-    #[serde(rename = "cummulativeQuoteQty")]
-    pub cumulative_quote_qty: Decimal,
-    pub status: String,
-    #[serde(rename = "type")]
-    pub order_type: String,
-    #[serde(rename = "side")]
-    pub order_side: String,
-    #[serde(rename = "avgPrice", default)]
-    pub avg_price: Option<Decimal>,
-    #[serde(rename = "transactTime", default)]
-    pub transact_time: Option<u64>,
-    #[serde(rename = "updateTime", default)]
-    pub update_time: Option<u64>,
-}
-
-impl BinanceOrder {
-    pub fn get_avg_price(&self) -> Decimal {
-        self.avg_price.unwrap_or_else(|| {
-            if self.executed_qty > Decimal::ZERO {
-                self.cumulative_quote_qty / self.executed_qty
-            } else {
-                Decimal::ZERO
-            }
-        })
-    }
-
-    pub fn get_timestamp(&self) -> u64 {
-        self.update_time.or(self.transact_time).unwrap_or(0)
-    }
-
-    pub fn commission(&self) -> Decimal {
-        let rate = match self.order_type.as_str() {
-            "LIMIT" => Decimal::from_str("0.0002").unwrap(),
-            _ => Decimal::from_str("0.0005").unwrap(),
-        };
-        self.executed_qty * self.get_avg_price() * rate
-    }
-}
-
-#[derive(Deserialize)]
-struct ListenKey {
-    #[serde(rename = "listenKey")]
-    listen_key: String,
 }
 
 #[derive(Deserialize)]
