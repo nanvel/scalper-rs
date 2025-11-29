@@ -100,7 +100,7 @@ impl LogManager {
                 }
                 LogLevel::Warning(message, show_for) => {
                     let show_for = show_for.unwrap_or(2);
-                    self.log_warning(&message);
+                    self.log_warning(&alert.message);
                     let until_ts = if let Some((_, ts)) = self.warnings_queue.front() {
                         Timestamp::from_seconds(ts.seconds() + show_for as u64)
                     } else {
@@ -109,7 +109,7 @@ impl LogManager {
                     self.warnings_queue.push_front((message, until_ts));
                 }
                 LogLevel::Error(message) => {
-                    self.log_error(&message);
+                    self.log_error(&alert.message);
                     self.status = Status::Critical(message);
                 }
             }

@@ -1,5 +1,6 @@
 use super::client::BinanceClient;
 use super::market_stream::start_market_stream;
+use super::orders_stream::start_orders_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
     CandlesState, Interval, Log, LogLevel, NewOrder, OpenInterestState, Order, OrderBookState,
@@ -56,6 +57,17 @@ impl Exchange for BinanceSpotExchange {
 
         self.set_interval(interval);
 
+        let keep_listen_key_alive = async |client: &BinanceClient, logs_sender: &Sender<Log>| {
+            loop {
+                sleep(Duration::from_mins(30)).await;
+                if client.has_auth() {
+                    let _ = client.refresh_listen_key().await;
+                    let _ = logs_sender
+                        .send(Log::new(LogLevel::Info, "Refreshed listen key".to_string()));
+                }
+            }
+        };
+
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
         let handle = thread::spawn(move || {
@@ -79,6 +91,19 @@ impl Exchange for BinanceSpotExchange {
                             logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
                         }
                     }
+
+                    res = start_orders_stream(
+                        &client_clone,
+                        &symbol_clone,
+                        &logs_sender_clone,
+                        orders_sender_clone,
+                    ) => {
+                        if let Err(e) = res {
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
+                        }
+                    }
+
+                    _ = keep_listen_key_alive(&client_clone, &logs_sender_clone) => {}
 
                     _ = shutdown_rx => {
                         logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string())).ok();

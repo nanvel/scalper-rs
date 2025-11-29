@@ -216,6 +216,42 @@ impl BinanceClient {
         self.handle_response(response).await
     }
 
+    async fn post_with_api_key<T: DeserializeOwned>(&self, endpoint: &str) -> Result<T> {
+        let access_key = self
+            .access_key
+            .as_ref()
+            .ok_or_else(|| BinanceError::AuthError("API key not set".to_string()))?;
+
+        let url = format!("{}{}", BASE_URL, endpoint);
+
+        let response = self
+            .client
+            .post(&url)
+            .header("X-MBX-APIKEY", access_key)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
+    async fn put_with_api_key<T: DeserializeOwned>(&self, endpoint: &str) -> Result<T> {
+        let access_key = self
+            .access_key
+            .as_ref()
+            .ok_or_else(|| BinanceError::AuthError("API key not set".to_string()))?;
+
+        let url = format!("{}{}", BASE_URL, endpoint);
+
+        let response = self
+            .client
+            .put(&url)
+            .header("X-MBX-APIKEY", access_key)
+            .send()
+            .await?;
+
+        self.handle_response(response).await
+    }
+
     // === Public API endpoints ===
 
     pub async fn get_symbol(&self) -> Result<Symbol> {
@@ -344,12 +380,12 @@ impl BinanceClient {
             quantity: resp.orig_qty,
             executed_quantity: resp.executed_qty,
             price: match &order.order_type {
-                OrderType::Stop => resp.stop_price,
+                OrderType::Stop => resp.stop_price.unwrap_or(resp.price),
                 _ => resp.price,
             },
-            average_price: resp.avg_price,
+            average_price: resp.get_avg_price(),
             commission: resp.commission(),
-            timestamp: Timestamp::from_milliseconds(resp.update_time),
+            timestamp: Timestamp::from_milliseconds(resp.get_timestamp()),
             is_update: false,
         })
     }
@@ -380,15 +416,18 @@ impl BinanceClient {
 
         Ok(Order {
             id: resp.order_id.to_string(),
-            order_type: order_type,
+            order_type: order_type.clone(),
             order_side: order_side,
             order_status: OrderStatus::Filled,
             quantity: resp.orig_qty,
             executed_quantity: resp.executed_qty,
-            price: resp.price,
-            average_price: resp.avg_price,
+            price: match order_type {
+                OrderType::Stop => resp.stop_price.unwrap_or(resp.price),
+                _ => resp.price,
+            },
+            average_price: resp.get_avg_price(),
             commission: resp.commission(),
-            timestamp: Timestamp::from_milliseconds(resp.update_time),
+            timestamp: Timestamp::from_milliseconds(resp.get_timestamp()),
             is_update: false,
         })
     }
@@ -398,12 +437,12 @@ impl BinanceClient {
     }
 
     pub async fn create_listen_key(&self) -> Result<String> {
-        let listen_key_resp: ListenKey = self.post_signed("/api/v3/listenKey", vec![]).await?;
+        let listen_key_resp: ListenKey = self.post_with_api_key("/api/v3/userDataStream").await?;
         Ok(listen_key_resp.listen_key)
     }
 
     pub async fn refresh_listen_key(&self) -> Result<()> {
-        self.put_signed::<ListenKey>("/api/v3/listenKey", vec![])
+        self.put_with_api_key::<ListenKey>("/api/v3/userDataStream")
             .await?;
         Ok(())
     }
@@ -454,30 +493,48 @@ pub struct BinanceOrder {
     #[serde(rename = "orderId")]
     pub order_id: u64,
     pub price: Decimal,
-    #[serde(rename = "stopPrice")]
-    pub stop_price: Decimal,
+    #[serde(rename = "stopPrice", default)]
+    pub stop_price: Option<Decimal>,
     #[serde(rename = "origQty")]
     pub orig_qty: Decimal,
     #[serde(rename = "executedQty")]
     pub executed_qty: Decimal,
+    #[serde(rename = "cummulativeQuoteQty")]
+    pub cumulative_quote_qty: Decimal,
     pub status: String,
     #[serde(rename = "type")]
     pub order_type: String,
     #[serde(rename = "side")]
     pub order_side: String,
-    #[serde(rename = "avgPrice")]
-    pub avg_price: Decimal,
-    #[serde(rename = "updateTime")]
-    pub update_time: u64,
+    #[serde(rename = "avgPrice", default)]
+    pub avg_price: Option<Decimal>,
+    #[serde(rename = "transactTime", default)]
+    pub transact_time: Option<u64>,
+    #[serde(rename = "updateTime", default)]
+    pub update_time: Option<u64>,
 }
 
 impl BinanceOrder {
+    pub fn get_avg_price(&self) -> Decimal {
+        self.avg_price.unwrap_or_else(|| {
+            if self.executed_qty > Decimal::ZERO {
+                self.cumulative_quote_qty / self.executed_qty
+            } else {
+                Decimal::ZERO
+            }
+        })
+    }
+
+    pub fn get_timestamp(&self) -> u64 {
+        self.update_time.or(self.transact_time).unwrap_or(0)
+    }
+
     pub fn commission(&self) -> Decimal {
         let rate = match self.order_type.as_str() {
             "LIMIT" => Decimal::from_str("0.0002").unwrap(),
             _ => Decimal::from_str("0.0005").unwrap(),
         };
-        self.executed_qty * self.avg_price * rate
+        self.executed_qty * self.get_avg_price() * rate
     }
 }
 
@@ -493,20 +550,4 @@ pub struct DepthSnapshot {
     pub last_update_id: u64,
     pub bids: Vec<[String; 2]>,
     pub asks: Vec<[String; 2]>,
-}
-
-#[derive(Deserialize)]
-struct OpenInterestHistEntry {
-    #[serde(rename = "sumOpenInterest")]
-    open_interest: Decimal,
-    #[serde(rename = "timestamp")]
-    timestamp: u64,
-}
-
-#[derive(Deserialize)]
-struct OpenInterestCurrentEntry {
-    #[serde(rename = "openInterest")]
-    open_interest: Decimal,
-    #[serde(rename = "time")]
-    timestamp: u64,
 }
