@@ -1838,6 +1838,7 @@ dependencies = [
  "chrono",
  "clap",
  "console",
+ "core-foundation",
  "dirs",
  "f64-fixed",
  "font-kit",
@@ -1854,6 +1855,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "toml",
+ "winapi",
 ]
 
 [[package]]

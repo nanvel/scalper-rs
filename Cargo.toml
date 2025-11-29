@@ -23,3 +23,9 @@ hex = "0.4.3"
 f64-fixed = "0.2.1"
 clap = { version = "4.5.51", features = ["derive"] }
 console = "0.16.1"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winbase"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.9"

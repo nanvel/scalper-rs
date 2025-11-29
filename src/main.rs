@@ -2,11 +2,13 @@ mod exchanges;
 mod models;
 mod renderer;
 mod trader;
+mod utils;
 
 use crate::exchanges::ExchangeFactory;
 use crate::models::{Log, LogLevel, Orders};
 use crate::renderer::Renderer;
 use crate::trader::Trader;
+use crate::utils::{allow_sleep, prevent_sleep};
 use console::Term;
 use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
@@ -83,6 +85,8 @@ fn main() {
         ColorSchema::for_theme(config.theme),
         font,
     );
+
+    prevent_sleep();
 
     let mut force_redraw = true;
     let mut left_was_pressed = false;
@@ -235,5 +239,7 @@ fn main() {
         force_redraw = false;
     }
 
-    exchange.stop()
+    exchange.stop();
+
+    allow_sleep();
 }
