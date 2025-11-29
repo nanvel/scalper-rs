@@ -1,6 +1,6 @@
-use super::auth::{build_signed_query, get_timestamp};
-use super::errors::{BinanceError, Result};
 use crate::exchanges::base::USER_AGENT;
+use crate::exchanges::binance_base::auth::{build_signed_query, get_timestamp};
+use crate::exchanges::binance_base::errors::{BinanceError, Result};
 use crate::models::{
     Candle, NewOrder, Order, OrderSide, OrderStatus, OrderType, Symbol, Timestamp,
 };
@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use std::str::FromStr;
 use tokio::runtime::Runtime;
 
-const BASE_URL: &str = "https://fapi.binance.com";
+const BASE_URL: &str = "https://api.binance.com";
 
 pub struct BinanceClient {
     client: Client,
@@ -21,6 +21,7 @@ pub struct BinanceClient {
     runtime: Runtime,
 }
 
+// https://developers.binance.com/docs/binance-spot-api-docs/rest-api/general-endpoints#exchange-information
 impl BinanceClient {
     pub fn new(symbol: String, access_key: Option<String>, secret_key: Option<String>) -> Self {
         Self {
@@ -218,7 +219,10 @@ impl BinanceClient {
     // === Public API endpoints ===
 
     pub async fn get_symbol(&self) -> Result<Symbol> {
-        let exchange_info: ExchangeInfo = self.get_public("/fapi/v1/exchangeInfo", None).await?;
+        let params: Vec<(&str, &str)> = vec![("symbol", self.symbol.as_str())];
+        let exchange_info: ExchangeInfo = self
+            .get_public("/api/v3/exchangeInfo", Some(&params))
+            .await?;
         for sym in exchange_info.symbols {
             if sym.symbol.eq_ignore_ascii_case(&self.symbol) {
                 let mut t_s = Decimal::ZERO;
@@ -260,8 +264,7 @@ impl BinanceClient {
             ("interval", interval),
             ("limit", limit_str.as_str()),
         ];
-        let data: Vec<serde_json::Value> =
-            self.get_public("/fapi/v1/klines", Some(&params)).await?;
+        let data: Vec<serde_json::Value> = self.get_public("/api/v3/klines", Some(&params)).await?;
 
         let candles: Vec<Candle> = data
             .iter()
@@ -289,44 +292,7 @@ impl BinanceClient {
             ("limit", limit_str.as_str()),
         ];
 
-        let result: DepthSnapshot = self.get_public("/fapi/v1/depth", Some(&params)).await?;
-
-        Ok(result)
-    }
-
-    pub async fn get_open_interest(&self) -> Result<(Timestamp, Decimal)> {
-        let params: Vec<(&str, &str)> = vec![("symbol", self.symbol.as_str())];
-
-        let resp: OpenInterestCurrentEntry = self
-            .get_public("/fapi/v1/openInterest", Some(&params))
-            .await?;
-
-        Ok((
-            Timestamp::from_milliseconds(resp.timestamp),
-            resp.open_interest,
-        ))
-    }
-
-    pub async fn get_open_interest_hist(&self) -> Result<Vec<(Timestamp, Decimal)>> {
-        let params: Vec<(&str, &str)> = vec![
-            ("symbol", self.symbol.as_str()),
-            ("period", "5m"),
-            ("limit", "500"),
-        ];
-
-        let resp: Vec<OpenInterestHistEntry> = self
-            .get_public("/futures/data/openInterestHist", Some(&params))
-            .await?;
-
-        let result = resp
-            .into_iter()
-            .map(|entry| {
-                (
-                    Timestamp::from_milliseconds(entry.timestamp),
-                    entry.open_interest,
-                )
-            })
-            .collect();
+        let result: DepthSnapshot = self.get_public("/api/v3/depth", Some(&params)).await?;
 
         Ok(result)
     }
@@ -362,7 +328,7 @@ impl BinanceClient {
             params.push(("timeInForce", "GTC".to_string()));
         };
 
-        let resp: BinanceOrder = self.post_signed("/fapi/v1/order", params).await?;
+        let resp: BinanceOrder = self.post_signed("/api/v3/order", params).await?;
 
         let order_status = match resp.status.as_str() {
             "NEW" => OrderStatus::Pending,
@@ -397,7 +363,7 @@ impl BinanceClient {
             ("symbol", self.symbol.clone()),
             ("orderId", order_id.to_string()),
         ];
-        let resp: BinanceOrder = self.delete_signed("/fapi/v1/order", params).await?;
+        let resp: BinanceOrder = self.delete_signed("/api/v3/order", params).await?;
 
         let order_type = match resp.order_type.as_str() {
             "MARKET" => OrderType::Market,
@@ -432,12 +398,12 @@ impl BinanceClient {
     }
 
     pub async fn create_listen_key(&self) -> Result<String> {
-        let listen_key_resp: ListenKey = self.post_signed("/fapi/v1/listenKey", vec![]).await?;
+        let listen_key_resp: ListenKey = self.post_signed("/api/v3/listenKey", vec![]).await?;
         Ok(listen_key_resp.listen_key)
     }
 
     pub async fn refresh_listen_key(&self) -> Result<()> {
-        self.put_signed::<ListenKey>("/fapi/v1/listenKey", vec![])
+        self.put_signed::<ListenKey>("/api/v3/listenKey", vec![])
             .await?;
         Ok(())
     }
