@@ -399,13 +399,23 @@ impl Renderer {
             &DrawOptions::new(),
         );
 
+        let pnl = to_fixed_string(trader.get_pnl().to_f64().unwrap(), 8);
+        let commission = trader.get_commission();
+        let commission = if commission > Decimal::ZERO {
+            to_fixed_string(commission.to_f64().unwrap(), 8)
+        } else {
+            "".to_string()
+        };
+
         let left_text = format!(
-            "{} <{} X {}> {} {}",
+            "{} <{} X {}> {} LOTS | {} ORDERS | PNL {} {}",
             interval.slug(),
             trader.size_quote.to_string(),
             trader.get_size_multiplier().to_string(),
             trader.get_lots(),
             trader.get_open_orders().len(),
+            pnl,
+            commission,
         );
         self.dt.draw_text(
             &self.font,
@@ -413,23 +423,6 @@ impl Renderer {
             &left_text,
             Point::new(
                 (area.left + 54) as f32,
-                (area.top + area.height / 2 + 4) as f32,
-            ),
-            &Source::Solid(self.color_schema.text_light.into()),
-            &DrawOptions::new(),
-        );
-
-        let pnl_text = format!(
-            "{} -{}",
-            to_fixed_string(trader.get_pnl().to_f64().unwrap(), 10),
-            to_fixed_string(trader.get_commission().to_f64().unwrap(), 10)
-        );
-        self.dt.draw_text(
-            &self.font,
-            ((area.height - 4) * 72 / 96) as f32,
-            &pnl_text,
-            Point::new(
-                (area.left + area.width - 200) as f32,
                 (area.top + area.height / 2 + 4) as f32,
             ),
             &Source::Solid(self.color_schema.text_light.into()),
@@ -581,7 +574,7 @@ impl Renderer {
         self.dt.fill_rect(
             area.left as f32,
             (area.top + area.height - height) as f32,
-            area.width as f32,
+            area.width as f32 - 1_f32,
             1.,
             &Source::Solid(self.color_schema.border.into()),
             &DrawOptions::new(),
@@ -596,7 +589,7 @@ impl Renderer {
             &DrawOptions::new(),
         );
 
-        let width = area.width as f32 * balance.to_f32().unwrap();
+        let width = (area.width - 2) as f32 * balance.to_f32().unwrap();
         self.dt.fill_rect(
             area.left as f32,
             (area.top + area.height - 5) as f32,
@@ -608,7 +601,7 @@ impl Renderer {
         self.dt.fill_rect(
             area.left as f32 + width + 1_f32,
             (area.top + area.height - 5) as f32,
-            area.width as f32 - width - 1_f32,
+            area.width as f32 - width - 3_f32,
             5.,
             &Source::Solid(self.color_schema.ask_bar.into()),
             &DrawOptions::new(),
