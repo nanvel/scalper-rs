@@ -5,10 +5,10 @@ mod trader;
 mod utils;
 
 use crate::exchanges::ExchangeFactory;
-use crate::models::{Log, LogLevel, Orders};
+use crate::models::{Log, LogLevel, OrderStatus, Orders};
 use crate::renderer::Renderer;
 use crate::trader::Trader;
-use crate::utils::{allow_sleep, prevent_sleep};
+use crate::utils::{allow_sleep, play_order_filled_async, prevent_sleep};
 use console::Term;
 use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
@@ -94,6 +94,9 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
+                if value.order_status == OrderStatus::Filled {
+                    play_order_filled_async();
+                }
                 trader.consume_order(value);
                 force_redraw = true;
             }
