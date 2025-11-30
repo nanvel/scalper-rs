@@ -76,12 +76,22 @@ impl Exchange for BinanceSpotExchange {
                         order_flow_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
+                            logs_sender_clone.send(
+                                Log::new(
+                                    LogLevel::Error("CONN".to_string()),
+                                    format!("{:?}", e),
+                                    None,
+                                )).ok();
                         }
                     }
 
                     _ = shutdown_rx => {
-                        logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string())).ok();
+                        logs_sender_clone.send(
+                            Log::new(
+                                LogLevel::Info,
+                                "Shutting down market stream listener".to_string(),
+                                None,
+                            )).ok();
                     }
                 }
 
@@ -139,14 +149,16 @@ impl Exchange for BinanceSpotExchange {
     fn place_order(&self, new_order: NewOrder) -> () {
         let _ = self.logs_sender.send(Log::new(
             LogLevel::Warning("NA".to_string(), None),
-            format!("Trading is supported on {}", self.name()).to_string(),
+            format!("Trading is not supported on {}", self.name()).to_string(),
+            None,
         ));
     }
 
     fn cancel_order(&self, order_id: String) -> () {
         let _ = self.logs_sender.send(Log::new(
             LogLevel::Warning("NA".to_string(), None),
-            format!("Trading is supported on {}", self.name()).to_string(),
+            format!("Trading is not supported on {}", self.name()).to_string(),
+            None,
         ));
     }
 }

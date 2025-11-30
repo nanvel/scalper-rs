@@ -63,8 +63,11 @@ impl Exchange for BinanceUSDFuturesExchange {
                 sleep(Duration::from_mins(30)).await;
                 if !client.has_auth() {
                     let _ = client.refresh_listen_key().await;
-                    let _ = logs_sender
-                        .send(Log::new(LogLevel::Info, "Refreshed listen key".to_string()));
+                    let _ = logs_sender.send(Log::new(
+                        LogLevel::Info,
+                        "Refreshed listen key".to_string(),
+                        None,
+                    ));
                 }
             }
         };
@@ -89,7 +92,7 @@ impl Exchange for BinanceUSDFuturesExchange {
                         order_flow_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e), None)).ok();
                         }
                     }
 
@@ -98,7 +101,7 @@ impl Exchange for BinanceUSDFuturesExchange {
                         open_interest_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e), None)).ok();
                         }
                     }
 
@@ -109,14 +112,14 @@ impl Exchange for BinanceUSDFuturesExchange {
                         orders_sender_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e))).ok();
+                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e), None)).ok();
                         }
                     }
 
                     _ = keep_listen_key_alive(&client_clone, &logs_sender_clone) => {}
 
                     _ = shutdown_rx => {
-                        logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string())).ok();
+                        logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string(), None)).ok();
                     }
                 }
 

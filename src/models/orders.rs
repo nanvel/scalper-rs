@@ -82,17 +82,24 @@ impl Orders {
         Self { orders: Vec::new() }
     }
 
-    pub fn consume(&mut self, order: Order) {
+    pub fn consume(&mut self, order: Order) -> bool {
+        let is_filled = order.order_status == OrderStatus::Filled;
         if let Some(pos) = self.orders.iter().position(|o| o.id == order.id) {
             if self.orders[pos].order_status == OrderStatus::Pending {
                 self.orders[pos] = order;
+
+                return is_filled;
             }
         } else {
             if !order.is_update {
                 // do not insert updates and the order could be created outside the app
                 self.orders.push(order);
+
+                return is_filled;
             }
         }
+
+        false
     }
 
     pub fn base_balance(&self) -> Decimal {

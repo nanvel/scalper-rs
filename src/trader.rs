@@ -171,8 +171,8 @@ impl Trader {
         }
     }
 
-    pub fn consume_order(&mut self, order: Order) {
-        self.orders.consume(order);
+    pub fn consume_order(&mut self, order: Order) -> bool {
+        self.orders.consume(order)
     }
 
     pub fn get_pnl(&self) -> Decimal {

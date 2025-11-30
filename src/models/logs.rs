@@ -1,4 +1,5 @@
-use crate::models::Timestamp;
+use super::sound::Sound;
+use super::timestamp::Timestamp;
 use console::{Term, style};
 use std::collections::VecDeque;
 use std::sync::mpsc::Receiver;
@@ -21,14 +22,16 @@ pub enum Status {
 pub struct Log {
     pub level: LogLevel,
     pub message: String,
+    pub sound: Option<Sound>,
     pub created_at: Timestamp,
 }
 
 impl Log {
-    pub fn new(level: LogLevel, message: String) -> Self {
+    pub fn new(level: LogLevel, message: String, sound: Option<Sound>) -> Self {
         Log {
             level,
             message,
+            sound,
             created_at: Timestamp::now(),
         }
     }
@@ -112,6 +115,14 @@ impl LogManager {
                     self.log_error(&alert.message);
                     self.status = Status::Critical(message);
                 }
+            }
+            if let Some(sound) = alert.sound {
+                let sound_clone = sound.clone();
+                std::thread::spawn(move || {
+                    if let Err(e) = sound_clone.play() {
+                        println!("Sound error: {:?}", e);
+                    }
+                });
             }
         }
     }
