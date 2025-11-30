@@ -22,12 +22,14 @@ fn main() {
     let (logs_sender, logs_receiver) = mpsc::channel();
     let (orders_sender, orders_receiver) = mpsc::channel();
 
-    let mut logs_manager = LogManager::new(logs_receiver, Term::stdout());
+    let mut logs_manager = LogManager::new(logs_receiver, Term::stdout(), false);
 
     let config = Config::load().unwrap_or_else(|err| {
         logs_manager.log_error(&format!("Error loading config: {}", err));
         std::process::exit(1);
     });
+
+    logs_manager.set_with_sound(config.sound);
 
     let mut interval = Interval::M1;
     let mut exchange = ExchangeFactory::create(

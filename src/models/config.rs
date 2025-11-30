@@ -33,6 +33,9 @@ pub struct Config {
     pub lot_mult_4: Option<usize>,
 
     pub sl_pnl: Option<Decimal>,
+
+    #[serde(default)]
+    pub sound: bool,
 }
 
 #[derive(Parser, Debug)]

@@ -10,8 +10,8 @@ pub enum Sound {
 impl Sound {
     pub fn play(&self) -> Result<(), Box<dyn std::error::Error>> {
         match self {
-            Sound::OrderFilled => self.play_frequencies(&[523.25, 659.25, 783.99]),
-            Sound::Warning => self.play_frequencies(&[523.25, 659.25, 783.99]),
+            Sound::OrderFilled => self.play_frequencies(&[523.25, 659.25]),
+            Sound::Warning => self.play_frequencies(&[523.25, 392.00, 523.25]),
         }
     }
 

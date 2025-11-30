@@ -42,16 +42,22 @@ pub struct LogManager {
     term: Term,
     warnings_queue: VecDeque<(String, Timestamp)>,
     status: Status,
+    with_sound: bool,
 }
 
 impl LogManager {
-    pub fn new(receiver: Receiver<Log>, term: Term) -> Self {
+    pub fn new(receiver: Receiver<Log>, term: Term, with_sound: bool) -> Self {
         LogManager {
             receiver,
             term,
             warnings_queue: VecDeque::new(),
             status: Status::Ok,
+            with_sound,
         }
+    }
+
+    pub fn set_with_sound(&mut self, with_sound: bool) {
+        self.with_sound = with_sound;
     }
 
     pub fn log_info(&self, message: &str) {
@@ -116,13 +122,15 @@ impl LogManager {
                     self.status = Status::Critical(message);
                 }
             }
-            if let Some(sound) = alert.sound {
-                let sound_clone = sound.clone();
-                std::thread::spawn(move || {
-                    if let Err(e) = sound_clone.play() {
-                        println!("Sound error: {:?}", e);
-                    }
-                });
+            if self.with_sound {
+                if let Some(sound) = alert.sound {
+                    let sound_clone = sound.clone();
+                    std::thread::spawn(move || {
+                        if let Err(e) = sound_clone.play() {
+                            println!("Sound error: {:?}", e);
+                        }
+                    });
+                }
             }
         }
     }
