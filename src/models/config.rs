@@ -115,6 +115,11 @@ impl Config {
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);
         }
+        if let Some(sl_pnl) = config.sl_pnl {
+            if sl_pnl > Decimal::ZERO {
+                config.sl_pnl = Some(-sl_pnl);
+            }
+        }
         if let Some(theme) = cli_overrides.theme {
             config.theme = match theme.to_lowercase().as_str() {
                 "light" => Theme::Light,

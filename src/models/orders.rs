@@ -166,28 +166,25 @@ impl Orders {
             .max_by_key(|o| o.timestamp)
     }
 
-    pub fn entry_price(&self) -> Option<Decimal> {
-        let mut total_qty = Decimal::ZERO;
-        let mut total_cost = Decimal::ZERO;
+    pub fn price_at_pnl(&self, pnl: Decimal) -> Option<Decimal> {
+        let base_balance = self.base_balance();
+        if base_balance == Decimal::ZERO {
+            return None;
+        }
+
+        let mut spent = Decimal::ZERO;
+        let mut received = Decimal::ZERO;
         for order in &self.orders {
-            if order.order_status == OrderStatus::Filled && order.executed_quantity > Decimal::ZERO
-            {
-                match order.order_side {
-                    OrderSide::Buy => {
-                        total_cost += order.average_price * order.executed_quantity;
-                        total_qty += order.executed_quantity;
-                    }
-                    OrderSide::Sell => {
-                        total_cost -= order.average_price * order.executed_quantity;
-                        total_qty -= order.executed_quantity;
-                    }
+            match order.order_side {
+                OrderSide::Buy => {
+                    spent += order.average_price * order.executed_quantity;
+                }
+                OrderSide::Sell => {
+                    received += order.average_price * order.executed_quantity;
                 }
             }
         }
-        if total_qty != Decimal::ZERO {
-            Some(total_cost / total_qty)
-        } else {
-            None
-        }
+
+        Some((pnl - received + spent) / base_balance)
     }
 }

@@ -220,20 +220,10 @@ impl Trader {
     }
 
     pub fn get_sl_price(&self) -> Option<Decimal> {
-        let balance = self.orders.base_balance();
-        if balance == Decimal::ZERO {
-            return None;
-        }
         if let Some(sl_pnl) = self.sl_pnl {
-            if let Some(entry_price) = self.orders.entry_price() {
-                let size = balance.abs();
-                if balance > Decimal::ZERO {
-                    return Some(entry_price - (sl_pnl / size));
-                } else if balance < Decimal::ZERO {
-                    return Some(entry_price + (sl_pnl / size));
-                }
-            }
+            self.orders.price_at_pnl(sl_pnl)
+        } else {
+            None
         }
-        None
     }
 }
