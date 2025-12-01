@@ -21,7 +21,7 @@ impl Layout {
     pub fn new(width: i32, height: i32) -> Self {
         let dom_width = 100;
         let order_flow_width = 100;
-        let status_height = 20;
+        let status_height = 24;
         let orders_width = 50;
         let volume_height = 80;
 

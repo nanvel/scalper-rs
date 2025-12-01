@@ -285,15 +285,15 @@ impl Renderer {
         // orders
         for order in trader.get_open_orders() {
             let color = match order.order_side {
-                OrderSide::Buy => self.color_schema.volume_buy,
-                OrderSide::Sell => self.color_schema.volume_sell,
+                OrderSide::Buy => self.color_schema.bid_bar,
+                OrderSide::Sell => self.color_schema.ask_bar,
             };
 
             let y = self.price_to_px(order.price);
 
             let mut pb = PathBuilder::new();
-            pb.move_to(area.left as f32 + 3_f32, y as f32);
-            pb.line_to((area.left + area.width / 2) as f32 - 1_f32, y as f32);
+            pb.move_to((area.left + area.width / 2) as f32 - 1_f32, y as f32);
+            pb.line_to((area.left + area.width - 1) as f32 + 3_f32, y as f32);
             let path = pb.finish();
 
             self.dt.stroke(
@@ -382,7 +382,7 @@ impl Renderer {
         self.dt.fill_rect(
             area.left as f32,
             area.top as f32,
-            50_f32,
+            55_f32,
             area.height as f32,
             &Source::Solid(status_color.into()),
             &DrawOptions::new(),
@@ -393,7 +393,7 @@ impl Renderer {
             &format!("{:^6}", status_text),
             Point::new(
                 (area.left + 4) as f32,
-                (area.top + area.height / 2 + 4) as f32,
+                (area.top + area.height / 2 + 5) as f32,
             ),
             &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
@@ -402,7 +402,7 @@ impl Renderer {
         let pnl = to_fixed_string(trader.get_pnl().to_f64().unwrap(), 8);
         let commission = trader.get_commission();
         let commission = if commission > Decimal::ZERO {
-            to_fixed_string(commission.to_f64().unwrap(), 8)
+            to_fixed_string(-commission.to_f64().unwrap(), 8)
         } else {
             "".to_string()
         };
@@ -422,7 +422,7 @@ impl Renderer {
             ((area.height - 4) * 72 / 96) as f32,
             &left_text,
             Point::new(
-                (area.left + 54) as f32,
+                (area.left + 60) as f32,
                 (area.top + area.height / 2 + 4) as f32,
             ),
             &Source::Solid(self.color_schema.text_light.into()),
