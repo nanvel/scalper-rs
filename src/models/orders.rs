@@ -1,5 +1,6 @@
 use crate::models::Timestamp;
 use rust_decimal::Decimal;
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum OrderSide {
@@ -70,6 +71,25 @@ impl Order {
             timestamp,
             is_update,
         }
+    }
+}
+
+impl Display for Order {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Order {{ id: {}, type: {:?}, side: {:?}, status: {:?}, quantity: {}, executed_quantity: {}, price: {}, average_price: {}, commission: {}, timestamp: {} }}",
+            self.id,
+            self.order_type,
+            self.order_side,
+            self.order_status,
+            self.quantity,
+            self.executed_quantity,
+            self.price,
+            self.average_price,
+            self.commission,
+            self.timestamp
+        )
     }
 }
 

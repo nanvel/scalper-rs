@@ -96,12 +96,13 @@ fn main() {
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
+                let order_str = value.to_string();
                 let filled = trader.consume_order(value);
                 if filled {
                     logs_sender
                         .send(Log::new(
                             LogLevel::Info,
-                            "Order filled.".to_string(),
+                            order_str,
                             Some(Sound::OrderFilled),
                         ))
                         .ok();
