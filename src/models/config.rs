@@ -33,6 +33,9 @@ pub struct Config {
     pub lot_mult_4: Option<usize>,
 
     pub sl_pnl: Option<Decimal>,
+
+    #[serde(default)]
+    pub sound: bool,
 }
 
 #[derive(Parser, Debug)]
@@ -111,6 +114,11 @@ impl Config {
         }
         if let Some(sl_pnl) = cli_overrides.sl_pnl {
             config.sl_pnl = Some(sl_pnl);
+        }
+        if let Some(sl_pnl) = config.sl_pnl {
+            if sl_pnl > Decimal::ZERO {
+                config.sl_pnl = Some(-sl_pnl);
+            }
         }
         if let Some(theme) = cli_overrides.theme {
             config.theme = match theme.to_lowercase().as_str() {

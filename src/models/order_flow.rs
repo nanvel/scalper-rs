@@ -42,6 +42,12 @@ impl OrderFlowState {
         }
         total_buy / (total_buy + total_sell)
     }
+
+    pub fn reset(&mut self) {
+        self.buys.clear();
+        self.sells.clear();
+        self.updated = Timestamp::now();
+    }
 }
 
 pub type SharedOrderFlowState = Arc<RwLock<OrderFlowState>>;

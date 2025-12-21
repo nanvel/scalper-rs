@@ -333,6 +333,56 @@ impl BinanceClient {
 
     // === Private API endpoints (require authentication) ===
 
+    pub async fn get_order(&self, order_id: &str) -> Result<Order> {
+        let params = vec![
+            ("symbol", self.symbol.clone()),
+            ("orderId", order_id.to_string()),
+        ];
+        let resp: BinanceOrder = self.get_signed("/fapi/v1/order", Some(params)).await?;
+
+        let order_type = match resp.order_type.as_str() {
+            "MARKET" => OrderType::Market,
+            "LIMIT" => OrderType::Limit,
+            "STOP_MARKET" => OrderType::Stop,
+            _ => return Err(BinanceError::ParseError("Unknown order type".to_string())),
+        };
+
+        let order_side = match resp.order_side.as_str() {
+            "BUY" => OrderSide::Buy,
+            "SELL" => OrderSide::Sell,
+            _ => return Err(BinanceError::ParseError("Unknown order side".to_string())),
+        };
+
+        let order_status = match resp.status.as_str() {
+            "NEW" => OrderStatus::Pending,
+            "PARTIALLY_FILLED" => OrderStatus::Pending,
+            _ => OrderStatus::Filled,
+        };
+
+        let price = match &order_type {
+            OrderType::Stop => resp.stop_price,
+            _ => resp.price,
+        };
+
+        Ok(Order {
+            id: resp.order_id.to_string(),
+            order_type,
+            order_side,
+            order_status,
+            quantity: resp.orig_qty,
+            executed_quantity: resp.executed_qty,
+            price,
+            average_price: resp.avg_price,
+            commission: resp.commission(),
+            timestamp: Timestamp::from_milliseconds(resp.update_time),
+            is_update: false,
+        })
+    }
+
+    pub fn get_order_sync(&self, order_id: &str) -> Result<Order> {
+        self.runtime.block_on(self.get_order(order_id))
+    }
+
     pub async fn place_order(&self, order: NewOrder) -> Result<Order> {
         let order_side = match order.order_side {
             OrderSide::Buy => "BUY",

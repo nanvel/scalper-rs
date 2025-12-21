@@ -1,5 +1,6 @@
 use crate::models::Timestamp;
 use rust_decimal::Decimal;
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum OrderSide {
@@ -73,6 +74,25 @@ impl Order {
     }
 }
 
+impl Display for Order {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Order {{ id: {}, type: {:?}, side: {:?}, status: {:?}, quantity: {}, executed_quantity: {}, price: {}, average_price: {}, commission: {}, timestamp: {} }}",
+            self.id,
+            self.order_type,
+            self.order_side,
+            self.order_status,
+            self.quantity,
+            self.executed_quantity,
+            self.price,
+            self.average_price,
+            self.commission,
+            self.timestamp
+        )
+    }
+}
+
 pub struct Orders {
     orders: Vec<Order>,
 }
@@ -82,17 +102,24 @@ impl Orders {
         Self { orders: Vec::new() }
     }
 
-    pub fn consume(&mut self, order: Order) {
+    pub fn consume(&mut self, order: Order) -> bool {
+        let is_filled = order.order_status == OrderStatus::Filled;
         if let Some(pos) = self.orders.iter().position(|o| o.id == order.id) {
             if self.orders[pos].order_status == OrderStatus::Pending {
                 self.orders[pos] = order;
+
+                return is_filled;
             }
         } else {
             if !order.is_update {
                 // do not insert updates and the order could be created outside the app
                 self.orders.push(order);
+
+                return is_filled;
             }
         }
+
+        false
     }
 
     pub fn base_balance(&self) -> Decimal {
@@ -159,28 +186,25 @@ impl Orders {
             .max_by_key(|o| o.timestamp)
     }
 
-    pub fn entry_price(&self) -> Option<Decimal> {
-        let mut total_qty = Decimal::ZERO;
-        let mut total_cost = Decimal::ZERO;
+    pub fn price_at_pnl(&self, pnl: Decimal) -> Option<Decimal> {
+        let base_balance = self.base_balance();
+        if base_balance == Decimal::ZERO {
+            return None;
+        }
+
+        let mut spent = Decimal::ZERO;
+        let mut received = Decimal::ZERO;
         for order in &self.orders {
-            if order.order_status == OrderStatus::Filled && order.executed_quantity > Decimal::ZERO
-            {
-                match order.order_side {
-                    OrderSide::Buy => {
-                        total_cost += order.average_price * order.executed_quantity;
-                        total_qty += order.executed_quantity;
-                    }
-                    OrderSide::Sell => {
-                        total_cost -= order.average_price * order.executed_quantity;
-                        total_qty -= order.executed_quantity;
-                    }
+            match order.order_side {
+                OrderSide::Buy => {
+                    spent += order.average_price * order.executed_quantity;
+                }
+                OrderSide::Sell => {
+                    received += order.average_price * order.executed_quantity;
                 }
             }
         }
-        if total_qty != Decimal::ZERO {
-            Some(total_cost / total_qty)
-        } else {
-            None
-        }
+
+        Some((pnl - received + spent) / base_balance)
     }
 }

@@ -1,4 +1,5 @@
-use crate::models::Timestamp;
+use super::sound::Sound;
+use super::timestamp::Timestamp;
 use console::{Term, style};
 use std::collections::VecDeque;
 use std::sync::mpsc::Receiver;
@@ -21,14 +22,16 @@ pub enum Status {
 pub struct Log {
     pub level: LogLevel,
     pub message: String,
+    pub sound: Option<Sound>,
     pub created_at: Timestamp,
 }
 
 impl Log {
-    pub fn new(level: LogLevel, message: String) -> Self {
+    pub fn new(level: LogLevel, message: String, sound: Option<Sound>) -> Self {
         Log {
             level,
             message,
+            sound,
             created_at: Timestamp::now(),
         }
     }
@@ -39,16 +42,22 @@ pub struct LogManager {
     term: Term,
     warnings_queue: VecDeque<(String, Timestamp)>,
     status: Status,
+    with_sound: bool,
 }
 
 impl LogManager {
-    pub fn new(receiver: Receiver<Log>, term: Term) -> Self {
+    pub fn new(receiver: Receiver<Log>, term: Term, with_sound: bool) -> Self {
         LogManager {
             receiver,
             term,
             warnings_queue: VecDeque::new(),
             status: Status::Ok,
+            with_sound,
         }
+    }
+
+    pub fn set_with_sound(&mut self, with_sound: bool) {
+        self.with_sound = with_sound;
     }
 
     pub fn log_info(&self, message: &str) {
@@ -100,7 +109,7 @@ impl LogManager {
                 }
                 LogLevel::Warning(message, show_for) => {
                     let show_for = show_for.unwrap_or(2);
-                    self.log_warning(&message);
+                    self.log_warning(&alert.message);
                     let until_ts = if let Some((_, ts)) = self.warnings_queue.front() {
                         Timestamp::from_seconds(ts.seconds() + show_for as u64)
                     } else {
@@ -109,8 +118,18 @@ impl LogManager {
                     self.warnings_queue.push_front((message, until_ts));
                 }
                 LogLevel::Error(message) => {
-                    self.log_error(&message);
+                    self.log_error(&alert.message);
                     self.status = Status::Critical(message);
+                }
+            }
+            if self.with_sound {
+                if let Some(sound) = alert.sound {
+                    let sound_clone = sound.clone();
+                    std::thread::spawn(move || {
+                        if let Err(e) = sound_clone.play() {
+                            println!("Sound error: {:?}", e);
+                        }
+                    });
                 }
             }
         }

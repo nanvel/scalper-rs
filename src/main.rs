@@ -2,11 +2,13 @@ mod exchanges;
 mod models;
 mod renderer;
 mod trader;
+mod utils;
 
 use crate::exchanges::ExchangeFactory;
-use crate::models::{Log, LogLevel, Orders};
+use crate::models::{Log, LogLevel, Orders, Sound};
 use crate::renderer::Renderer;
 use crate::trader::Trader;
+use crate::utils::{allow_sleep, prevent_sleep};
 use console::Term;
 use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
@@ -20,12 +22,14 @@ fn main() {
     let (logs_sender, logs_receiver) = mpsc::channel();
     let (orders_sender, orders_receiver) = mpsc::channel();
 
-    let mut logs_manager = LogManager::new(logs_receiver, Term::stdout());
+    let mut logs_manager = LogManager::new(logs_receiver, Term::stdout(), false);
 
     let config = Config::load().unwrap_or_else(|err| {
         logs_manager.log_error(&format!("Error loading config: {}", err));
         std::process::exit(1);
     });
+
+    logs_manager.set_with_sound(config.sound);
 
     let mut interval = Interval::M1;
     let mut exchange = ExchangeFactory::create(
@@ -84,13 +88,25 @@ fn main() {
         font,
     );
 
+    prevent_sleep();
+
     let mut force_redraw = true;
     let mut left_was_pressed = false;
     let mut sl_triggered = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
         match orders_receiver.try_recv() {
             Ok(value) => {
-                trader.consume_order(value);
+                let order_str = value.to_string();
+                let filled = trader.consume_order(value);
+                if filled {
+                    logs_sender
+                        .send(Log::new(
+                            LogLevel::Info,
+                            order_str,
+                            Some(Sound::OrderFilled),
+                        ))
+                        .ok();
+                }
                 force_redraw = true;
             }
             Err(mpsc::TryRecvError::Empty) => {}
@@ -146,6 +162,10 @@ fn main() {
             if let Some(new_order) = trader.reverse() {
                 exchange.place_order(new_order);
             }
+        }
+
+        if window.is_key_pressed(Key::N, minifb::KeyRepeat::No) {
+            shared_state.order_flow.write().unwrap().reset();
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No) && shift_pressed {
@@ -210,6 +230,7 @@ fn main() {
                         .send(Log::new(
                             LogLevel::Error("SL".to_string()),
                             format!("Stop-loss triggered at pnl: {:.2}", trader.get_pnl()),
+                            None,
                         ))
                         .unwrap()
                 }
@@ -235,5 +256,7 @@ fn main() {
         force_redraw = false;
     }
 
-    exchange.stop()
+    exchange.stop();
+
+    allow_sleep();
 }

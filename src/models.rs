@@ -10,6 +10,7 @@ mod order_book;
 mod order_flow;
 mod orders;
 mod shared_state;
+mod sound;
 mod symbol;
 mod timestamp;
 
@@ -26,5 +27,6 @@ pub use order_book::{OrderBookState, SharedOrderBookState};
 pub use order_flow::{OrderFlowState, SharedOrderFlowState};
 pub use orders::{NewOrder, Order, OrderSide, OrderStatus, OrderType, Orders};
 pub use shared_state::SharedState;
+pub use sound::Sound;
 pub use symbol::Symbol;
 pub use timestamp::Timestamp;

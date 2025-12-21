@@ -59,6 +59,7 @@ pub async fn start_orders_stream(
                             logs_sender.send(Log::new(
                                 LogLevel::Warning("STREAM".to_string(), None),
                                 format!("{:?}", e),
+                                None,
                             ))?;
                             sleep(Duration::from_secs(5)).await;
                             break;
@@ -71,6 +72,7 @@ pub async fn start_orders_stream(
                 logs_sender.send(Log::new(
                     LogLevel::Error("AUTH".to_string()),
                     format!("{:?}", er),
+                    None,
                 ))?;
 
                 loop {
