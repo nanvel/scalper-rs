@@ -185,10 +185,24 @@ impl Exchange for BinanceUSDFuturesExchange {
 
     fn cancel_order(&self, order_id: String) -> () {
         let client = self.client.clone();
-        let sender_clone = self.orders_sender.clone();
-        thread::spawn(move || {
-            let order = client.cancel_order_sync(&order_id).unwrap();
-            sender_clone.send(order).unwrap();
+        let orders_sender_clone = self.orders_sender.clone();
+        let logs_sender_clone = self.logs_sender.clone();
+        thread::spawn(move || match client.cancel_order_sync(&order_id) {
+            Ok(order) => {
+                orders_sender_clone.send(order).unwrap();
+            }
+            Err(e) => {
+                logs_sender_clone
+                    .send(Log::new(
+                        LogLevel::Warning("WARN".to_string(), None),
+                        format!("Failed to cancel order {}: {:?}", order_id, e),
+                        None,
+                    ))
+                    .unwrap();
+                if let Ok(order) = client.get_order_sync(&order_id) {
+                    orders_sender_clone.send(order).unwrap();
+                }
+            }
         });
     }
 }
