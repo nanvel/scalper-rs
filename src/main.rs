@@ -164,6 +164,10 @@ fn main() {
             }
         }
 
+        if window.is_key_pressed(Key::N, minifb::KeyRepeat::No) {
+            shared_state.order_flow.write().unwrap().reset();
+        }
+
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No) && shift_pressed {
             renderer.scale_out();
             force_redraw = true;
