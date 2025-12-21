@@ -24,6 +24,7 @@ f64-fixed = "0.2.1"
 clap = { version = "4.5.51", features = ["derive"] }
 console = "0.16.1"
 rodio = { version = "0.17", default-features = false }
+once_cell = "1.21.3"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["winbase"] }

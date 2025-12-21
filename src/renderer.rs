@@ -423,7 +423,7 @@ impl Renderer {
             &left_text,
             Point::new(
                 (area.left + 60) as f32,
-                (area.top + area.height / 2 + 4) as f32,
+                (area.top + area.height / 2 + 5) as f32,
             ),
             &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),

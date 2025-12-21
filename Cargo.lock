@@ -2189,6 +2189,7 @@ dependencies = [
  "hex",
  "hmac",
  "minifb",
+ "once_cell",
  "raqote",
  "reqwest",
  "rodio",
