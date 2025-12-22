@@ -29,6 +29,7 @@ pub struct ColorSchema {
     pub volume_buy: Color,
     pub volume_sell: Color,
     pub open_interest: Color,
+    pub alert: Color,
 
     pub text_light: Color,
     pub text_dark: Color,
@@ -67,6 +68,8 @@ impl ColorSchema {
             volume_sell: Color::new(239, 68, 68, 128), // #EF4444 at 50% opacity
 
             open_interest: Color::new(148, 163, 184, 128), // #94A3B8 at 50% opacity
+
+            alert: Color::new(255, 255, 255, 128), // #FFFFFF at 50% opacity
 
             // Text colors
             text_light: Color::new(229, 231, 235, 255), // #E5E7EB
@@ -108,6 +111,8 @@ impl ColorSchema {
             volume_sell: Color::new(239, 68, 68, 128), // #EF4444 at 50% opacity
 
             open_interest: Color::new(100, 116, 139, 128), // #64748B at 50% opacity
+
+            alert: Color::new(0, 0, 0, 128), // #000000 at 50% opacity
 
             // Text colors
             text_light: Color::new(31, 41, 55, 255), // #1F2937

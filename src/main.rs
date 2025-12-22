@@ -14,7 +14,7 @@ use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
 use font_kit::source::SystemSource;
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{ColorSchema, Config, Interval, LogManager};
+use models::{ColorSchema, Config, Interval, LogManager, PriceAlert, PriceAlerts, TriggerType};
 use rust_decimal::Decimal;
 use std::sync::mpsc;
 
@@ -49,6 +49,8 @@ fn main() {
         logs_manager.log_error(&format!("Error starting streams: {}", err));
         std::process::exit(1);
     });
+
+    let mut price_alerts = PriceAlerts::new();
 
     let mut window = Window::new(
         &format!("{} - {}", symbol.slug, exchange.name()),
@@ -118,7 +120,20 @@ fn main() {
     let mut left_was_pressed = false;
     let mut sl_triggered = false;
     while window.is_open() && !window.is_key_down(Key::Escape) {
-        force_redraw = consume_orders(&mut trader);
+        force_redraw = force_redraw || consume_orders(&mut trader);
+
+        if trader.bid.is_some() && trader.ask.is_some() {
+            for alert in price_alerts.scan(trader.bid.unwrap(), trader.ask.unwrap()) {
+                logs_sender
+                    .send(Log::new(
+                        LogLevel::Info,
+                        format!("Price alert triggered at {:.8}", alert.price),
+                        Some(Sound::OrderFilled),
+                    ))
+                    .unwrap();
+                force_redraw = true;
+            }
+        }
 
         {
             let order_book = shared_state.order_book.read().unwrap();
@@ -204,19 +219,32 @@ fn main() {
         }
 
         let left_pressed = window.get_mouse_down(MouseButton::Left);
-        if left_pressed && !left_was_pressed && ctrl_pressed {
+        if left_pressed && !left_was_pressed {
             if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
                 let price = renderer.px_to_price(y as i32);
-                if price > Decimal::ZERO {
-                    if shift_pressed {
-                        if let Some(new_order) = trader.stop(price) {
-                            exchange.place_order(new_order);
-                        }
-                    } else {
-                        if let Some(new_order) = trader.limit(price) {
-                            exchange.place_order(new_order);
-                        }
-                    };
+                if ctrl_pressed {
+                    if price > Decimal::ZERO {
+                        if shift_pressed {
+                            if let Some(new_order) = trader.stop(price) {
+                                exchange.place_order(new_order);
+                            }
+                        } else {
+                            if let Some(new_order) = trader.limit(price) {
+                                exchange.place_order(new_order);
+                            }
+                        };
+                        force_redraw = true;
+                    }
+                } else if shift_pressed && trader.bid.is_some() {
+                    price_alerts.add_alert(
+                        price,
+                        if trader.bid.unwrap() >= price {
+                            TriggerType::Lte
+                        } else {
+                            TriggerType::Gte
+                        },
+                    );
+                    force_redraw = true;
                 }
             }
         }
@@ -226,6 +254,8 @@ fn main() {
             for o in trader.get_open_orders() {
                 exchange.cancel_order(o.id.clone());
             }
+            price_alerts.clear();
+            force_redraw = true;
         }
 
         if trader.bid.is_some() {
@@ -262,6 +292,7 @@ fn main() {
             &trader,
             logs_manager.status(),
             interval,
+            &price_alerts,
             ctrl_pressed,
             force_redraw,
         );

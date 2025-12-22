@@ -1,6 +1,6 @@
 use crate::models::{
     CandlesState, ColorSchema, Interval, Layout, OpenInterestState, OrderBookState, OrderFlowState,
-    OrderSide, SharedState, Status, Timestamp,
+    OrderSide, PriceAlerts, SharedState, Status, Timestamp,
 };
 use crate::trader::Trader;
 use chrono::Utc;
@@ -120,6 +120,7 @@ impl Renderer {
         trader: &Trader,
         status: Status,
         interval: Interval,
+        price_alerts: &PriceAlerts,
         locked: bool,
         force_redraw: bool,
     ) {
@@ -147,7 +148,7 @@ impl Renderer {
         let scale_step = self.scale_step();
 
         if self.candles_updated != candles_updated || self.force_redraw {
-            self.draw_orders(trader, price, scale_step);
+            self.draw_orders(trader, price, scale_step, price_alerts);
             self.draw_candles(
                 &shared_state.candles.read().unwrap(),
                 &shared_state.open_interest.read().unwrap(),
@@ -210,7 +211,13 @@ impl Renderer {
         );
     }
 
-    fn draw_orders(&mut self, trader: &Trader, price: Decimal, scale_step: Decimal) {
+    fn draw_orders(
+        &mut self,
+        trader: &Trader,
+        price: Decimal,
+        scale_step: Decimal,
+        price_alerts: &PriceAlerts,
+    ) {
         let area = self.layout.orders_area;
 
         self.dt.fill_rect(
@@ -309,6 +316,27 @@ impl Renderer {
             );
         }
 
+        for price_alert in price_alerts.alerts.iter() {
+            let y = self.price_to_px(price_alert.price);
+
+            let mut pb = PathBuilder::new();
+            pb.move_to((area.left + area.width / 2) as f32 - 1_f32, y as f32);
+            pb.line_to((area.left + area.width - 1) as f32 + 3_f32, y as f32);
+            let path = pb.finish();
+
+            self.dt.stroke(
+                &path,
+                &Source::Solid(self.color_schema.alert.into()),
+                &StrokeStyle {
+                    width: 1.0,
+                    cap: LineCap::Round,
+                    join: LineJoin::Round,
+                    ..Default::default()
+                },
+                &DrawOptions::new(),
+            );
+        }
+
         if let Some(order) = trader.get_last_closed_order() {
             // solid triangle
             let color = match order.order_side {
@@ -325,6 +353,26 @@ impl Renderer {
             self.dt.stroke(
                 &path,
                 &Source::Solid(color.into()),
+                &StrokeStyle {
+                    width: 2.0,
+                    cap: LineCap::Round,
+                    join: LineJoin::Round,
+                    ..Default::default()
+                },
+                &DrawOptions::new(),
+            );
+        }
+
+        if let Some(alert) = price_alerts.last_triggered {
+            let y = self.price_to_px(alert.price);
+            let mut pb = PathBuilder::new();
+            pb.move_to(area.left as f32 + 3_f32, y as f32);
+            pb.line_to((area.left + area.width) as f32 - 1_f32, y as f32);
+            let path = pb.finish();
+
+            self.dt.stroke(
+                &path,
+                &Source::Solid(self.color_schema.alert.into()),
                 &StrokeStyle {
                     width: 2.0,
                     cap: LineCap::Round,
