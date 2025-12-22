@@ -90,10 +90,8 @@ fn main() {
 
     prevent_sleep();
 
-    let mut force_redraw = true;
-    let mut left_was_pressed = false;
-    let mut sl_triggered = false;
-    while window.is_open() && !window.is_key_down(Key::Escape) {
+    let mut consume_orders = |trader: &mut Trader| {
+        let mut consumed = false;
         match orders_receiver.try_recv() {
             Ok(value) => {
                 let order_str = value.to_string();
@@ -107,11 +105,20 @@ fn main() {
                         ))
                         .ok();
                 }
-                force_redraw = true;
+                consumed = true;
             }
             Err(mpsc::TryRecvError::Empty) => {}
             Err(mpsc::TryRecvError::Disconnected) => {}
-        };
+        }
+
+        consumed
+    };
+
+    let mut force_redraw = true;
+    let mut left_was_pressed = false;
+    let mut sl_triggered = false;
+    while window.is_open() && !window.is_key_down(Key::Escape) {
+        force_redraw = consume_orders(&mut trader);
 
         {
             let order_book = shared_state.order_book.read().unwrap();
@@ -221,11 +228,22 @@ fn main() {
             }
         }
 
-        if trader.bid.is_some() && !sl_triggered {
-            if let Some(sl_pnl) = config.sl_pnl {
+        if trader.bid.is_some() {
+            if let Some(sl_pnl) = config.sl_pnl
+                && !sl_triggered
+            {
                 if trader.get_pnl() < -sl_pnl.abs() {
                     sl_triggered = true;
+
                     trader.flat();
+                    consume_orders(&mut trader);
+                    for o in trader.get_open_orders() {
+                        exchange.cancel_order(o.id.clone());
+                    }
+                    consume_orders(&mut trader);
+                    trader.flat();
+                    force_redraw = true;
+
                     logs_sender
                         .send(Log::new(
                             LogLevel::Error("SL".to_string()),
