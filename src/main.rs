@@ -274,7 +274,19 @@ fn main() {
         force_redraw = false;
     }
 
+    if config.cleanup_on_shutdown {
+        trader.flat();
+        consume_orders(&mut trader);
+        for o in trader.get_open_orders() {
+            exchange.cancel_order(o.id.clone());
+        }
+        consume_orders(&mut trader);
+        trader.flat();
+    }
+
     exchange.stop();
+
+    logs_manager.consume();
 
     allow_sleep();
 }
