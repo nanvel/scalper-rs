@@ -184,7 +184,18 @@ impl Trader {
     }
 
     pub fn get_open_orders(&self) -> Vec<&Order> {
-        self.orders.open()
+        // sorted by distance to price
+        let mut orders = self.orders.open();
+        if let Some(bid) = self.bid {
+            orders.sort_by(|a, b| {
+                let dist_a = (a.price - bid).abs();
+                let dist_b = (b.price - bid).abs();
+                dist_a.cmp(&dist_b)
+            });
+            orders
+        } else {
+            orders
+        }
     }
 
     pub fn get_last_closed_order(&self) -> Option<&Order> {
