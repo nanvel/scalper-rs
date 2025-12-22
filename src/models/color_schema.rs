@@ -54,7 +54,7 @@ impl ColorSchema {
 
             // Base colors
             background: Color::new(17, 24, 39, 255), // #111827
-            status_bar_background: Color::new(31, 41, 55, 255), // #1F2937
+            status_bar_background: Color::new(22, 30, 46, 255), // #161E2E
 
             // Candles
             bullish_candle: Color::new(34, 197, 94, 255), // #22C55E
@@ -97,7 +97,7 @@ impl ColorSchema {
 
             // Base colors
             background: Color::new(255, 255, 255, 255), // #FFFFFF
-            status_bar_background: Color::new(240, 240, 240, 255), // #F0F0F0
+            status_bar_background: Color::new(245, 245, 245, 255), // #F5F5F5
 
             // Candles
             bullish_candle: Color::new(16, 185, 129, 255), // #10B981
@@ -122,7 +122,7 @@ impl ColorSchema {
             text_error: Color::new(220, 38, 38, 255), // #DC2626
 
             // UI elements
-            border: Color::new(229, 231, 235, 255), // #E5E7EB
+            border: Color::new(220, 220, 220, 255), // #DCDCDC
             crosshair: Color::new(107, 114, 128, 255), // #6B7280
             scale_bar: Color::new(139, 92, 246, 255), // #8B5CF6
             sl_line: Color::new(220, 38, 38, 255),  // #DC2626
