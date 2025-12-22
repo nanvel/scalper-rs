@@ -12,6 +12,7 @@ use raqote::{
 };
 use rust_decimal::Decimal;
 use rust_decimal::prelude::{FromStr, ToPrimitive};
+use std::convert::Into;
 
 const PX_PER_TICK_CHOICES: [&str; 17] = [
     "0.01", "0.02", "0.05", "0.1", "0.2", "0.5", "1", "3", "5", "7", "9", "11", "13", "15", "17",
@@ -153,6 +154,7 @@ impl Renderer {
                 &shared_state.candles.read().unwrap(),
                 &shared_state.open_interest.read().unwrap(),
                 scale_step,
+                &interval,
             );
             self.candles_updated = candles_updated;
         }
@@ -179,36 +181,9 @@ impl Renderer {
             self.order_flow_updated = order_flow_updated;
         }
 
-        self.draw_status(&status, &interval, trader);
-        self.draw_time();
+        self.draw_status(&status, trader);
 
         self.force_redraw = false;
-    }
-
-    fn draw_time(&mut self) {
-        let area = self.layout.candles_area;
-        let now = Utc::now();
-
-        self.dt.fill_rect(
-            area.left as f32,
-            (area.top + area.height - self.layout.volume_height - 26) as f32,
-            100_f32,
-            20_f32,
-            &Source::Solid(self.color_schema.background.into()),
-            &DrawOptions::new(),
-        );
-
-        self.dt.draw_text(
-            &self.font,
-            (16 * 72 / 96) as f32,
-            &now.format("%H:%M:%S UTC").to_string(),
-            Point::new(
-                (area.left + 4) as f32,
-                (area.top + area.height - self.layout.volume_height - 12) as f32,
-            ),
-            &Source::Solid(self.color_schema.text_light.into()),
-            &DrawOptions::new(),
-        );
     }
 
     fn draw_orders(
@@ -404,7 +379,7 @@ impl Renderer {
         }
     }
 
-    fn draw_status(&mut self, status: &Status, interval: &Interval, trader: &Trader) {
+    fn draw_status(&mut self, status: &Status, trader: &Trader) {
         let area = self.layout.status_area;
 
         self.dt.fill_rect(
@@ -412,7 +387,7 @@ impl Renderer {
             area.top as f32,
             area.width as f32,
             area.height as f32,
-            &Source::Solid(self.color_schema.background.into()),
+            &Source::Solid(self.color_schema.status_bar_background.into()),
             &DrawOptions::new(),
         );
 
@@ -456,8 +431,7 @@ impl Renderer {
         };
 
         let left_text = format!(
-            "{} <{} X {}> {} LOTS | {} ORDERS | PNL {} {}",
-            interval.slug(),
+            "<{} X {}> {} LOTS | {} ORDERS | PNL {} {}",
             trader.size_quote.to_string(),
             trader.get_size_multiplier().to_string(),
             trader.get_lots(),
@@ -471,6 +445,19 @@ impl Renderer {
             &left_text,
             Point::new(
                 (area.left + 60) as f32,
+                (area.top + area.height / 2 + 5) as f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
+
+        let now = Utc::now();
+        self.dt.draw_text(
+            &self.font,
+            ((area.height - 4) * 72 / 96) as f32,
+            &now.format("%H:%M:%S").to_string(),
+            Point::new(
+                (area.left + area.width - 75) as f32,
                 (area.top + area.height / 2 + 5) as f32,
             ),
             &Source::Solid(self.color_schema.text_light.into()),
@@ -812,6 +799,7 @@ impl Renderer {
         candles_state: &CandlesState,
         open_interest_state: &OpenInterestState,
         scale_step: Decimal,
+        interval: &Interval,
     ) {
         let area = self.layout.candles_area;
         self.dt.fill_rect(
@@ -911,15 +899,6 @@ impl Renderer {
             &DrawOptions::new(),
         );
 
-        self.dt.fill_rect(
-            area.left as f32,
-            (area.top + area.height - volume_height - 5) as f32,
-            area.width as f32,
-            1.,
-            &Source::Solid(self.color_schema.border.into()),
-            &DrawOptions::new(),
-        );
-
         let vh_dec = Decimal::from(volume_height);
         let oi_diff = max_oi - min_oi;
         if max_volume > Decimal::ZERO {
@@ -992,28 +971,6 @@ impl Renderer {
                 join: LineJoin::Round,
                 ..Default::default()
             },
-            &DrawOptions::new(),
-        );
-
-        // current price
-        self.dt.fill_rect(
-            (area.left + area.width) as f32 - 60_f32,
-            (area.top + area.height) as f32 - volume_height as f32 - 26_f32,
-            59_f32,
-            20_f32,
-            &Source::Solid(self.color_schema.background.into()),
-            &DrawOptions::new(),
-        );
-
-        self.dt.draw_text(
-            &self.font,
-            (16 * 72 / 96) as f32,
-            &to_fixed_string(current_price.to_f64().unwrap(), 8),
-            Point::new(
-                (area.left + area.width - 55) as f32,
-                (area.top + area.height) as f32 - volume_height as f32 - 12_f32,
-            ),
-            &Source::Solid(self.color_schema.text_light.into()),
             &DrawOptions::new(),
         );
 
@@ -1122,6 +1079,39 @@ impl Renderer {
                 );
             }
         }
+
+        self.dt.fill_rect(
+            area.left as f32,
+            (area.top + area.height - self.layout.volume_height - 24) as f32,
+            area.width as f32,
+            20_f32,
+            &Source::Solid(self.color_schema.status_bar_background.into()),
+            &DrawOptions::new(),
+        );
+
+        self.dt.draw_text(
+            &self.font,
+            (16 * 72 / 96) as f32,
+            &interval.slug().to_string(),
+            Point::new(
+                (area.left + 8) as f32,
+                (area.top + area.height - self.layout.volume_height - 10) as f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
+
+        self.dt.draw_text(
+            &self.font,
+            (16 * 72 / 96) as f32,
+            &to_fixed_string(current_price.to_f64().unwrap(), 8),
+            Point::new(
+                (area.left + area.width - 55) as f32,
+                (area.top + area.height - self.layout.volume_height - 10) as f32,
+            ),
+            &Source::Solid(self.color_schema.text_light.into()),
+            &DrawOptions::new(),
+        );
     }
 
     fn adjust_center(&mut self, price: Decimal) {

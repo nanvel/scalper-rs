@@ -97,7 +97,7 @@ impl ColorSchema {
 
             // Base colors
             background: Color::new(255, 255, 255, 255), // #FFFFFF
-            status_bar_background: Color::new(248, 249, 250, 255), // #F8F9FA
+            status_bar_background: Color::new(240, 240, 240, 255), // #F0F0F0
 
             // Candles
             bullish_candle: Color::new(16, 185, 129, 255), // #10B981
