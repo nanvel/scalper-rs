@@ -78,10 +78,6 @@ impl CandlesState {
         result
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.size == 0
-    }
-
     pub fn last(&self) -> Option<Candle> {
         if self.size == 0 {
             return None;

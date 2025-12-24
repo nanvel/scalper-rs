@@ -92,7 +92,7 @@ fn main() {
 
     prevent_sleep();
 
-    let mut consume_orders = |trader: &mut Trader| {
+    let consume_orders = |trader: &mut Trader| {
         let mut consumed = false;
         match orders_receiver.try_recv() {
             Ok(value) => {
@@ -220,7 +220,7 @@ fn main() {
 
         let left_pressed = window.get_mouse_down(MouseButton::Left);
         if left_pressed && !left_was_pressed {
-            if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
+            if let Some((_x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
                 let price = renderer.px_to_price(y as i32);
                 if ctrl_pressed {
                     if price > Decimal::ZERO {

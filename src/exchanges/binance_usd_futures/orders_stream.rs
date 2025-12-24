@@ -146,10 +146,6 @@ fn process_filled_order(er: &ExecutionReport, orders_sender: &Sender<Order>) {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ExecutionReport {
-    #[serde(rename = "e")]
-    pub event_type: Option<String>,
-    #[serde(rename = "E")]
-    pub event_time: Option<u64>,
     #[serde(rename = "s")]
     pub symbol: Option<String>,
     #[serde(rename = "S")]
@@ -160,18 +156,12 @@ pub struct ExecutionReport {
     pub orig_qty: Option<Decimal>,
     #[serde(rename = "p")]
     pub price: Option<Decimal>,
-    #[serde(rename = "x")]
-    pub current_exec_type: Option<String>,
     #[serde(rename = "X")]
     pub current_order_status: Option<String>,
     #[serde(rename = "i")]
     pub order_id: Option<u64>,
-    #[serde(rename = "l")]
-    pub last_executed_qty: Option<String>,
     #[serde(rename = "z")]
     pub accumulated_executed_qty: Option<Decimal>,
-    #[serde(rename = "L")]
-    pub last_executed_price: Option<String>,
     #[serde(rename = "T")]
     pub trade_time: Option<u64>,
     #[serde(rename = "ap")]

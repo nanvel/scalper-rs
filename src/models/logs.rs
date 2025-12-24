@@ -88,7 +88,7 @@ impl LogManager {
     }
 
     pub fn status(&mut self) -> Status {
-        if let Status::Critical(message) = &self.status {
+        if let Status::Critical(_message) = &self.status {
             return self.status.clone();
         }
         if let Some((message, remove_at)) = self.warnings_queue.back() {

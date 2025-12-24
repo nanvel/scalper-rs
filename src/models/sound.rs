@@ -5,7 +5,6 @@ use std::time::Duration;
 pub enum Sound {
     Alert,
     OrderFilled,
-    Warning,
 }
 
 impl Sound {
@@ -13,7 +12,6 @@ impl Sound {
         match self {
             Sound::OrderFilled => self.play_frequencies(&[523.25, 659.25]),
             Sound::Alert => self.play_frequencies(&[523.25]),
-            Sound::Warning => self.play_frequencies(&[523.25, 392.00, 523.25]),
         }
     }
 

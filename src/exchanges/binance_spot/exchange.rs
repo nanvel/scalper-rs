@@ -47,10 +47,8 @@ impl Exchange for BinanceSpotExchange {
         let candles_clone = shared_candles_state.clone();
         let order_book_clone = shared_order_book_state.clone();
         let order_flow_clone = shared_order_flow_state.clone();
-        let open_interest_clone = shared_open_interest_state.clone();
 
         let logs_sender_clone = self.logs_sender.clone();
-        let orders_sender_clone = self.orders_sender.clone();
 
         let client_clone = self.client.clone();
 
@@ -146,7 +144,7 @@ impl Exchange for BinanceSpotExchange {
         }
     }
 
-    fn place_order(&self, new_order: NewOrder) -> () {
+    fn place_order(&self, _new_order: NewOrder) -> () {
         let _ = self.logs_sender.send(Log::new(
             LogLevel::Warning("NA".to_string(), None),
             format!("Trading is not supported on {}", self.name()).to_string(),
@@ -154,7 +152,7 @@ impl Exchange for BinanceSpotExchange {
         ));
     }
 
-    fn cancel_order(&self, order_id: String) -> () {
+    fn cancel_order(&self, _order_id: String) -> () {
         let _ = self.logs_sender.send(Log::new(
             LogLevel::Warning("NA".to_string(), None),
             format!("Trading is not supported on {}", self.name()).to_string(),
