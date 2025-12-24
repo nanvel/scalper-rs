@@ -55,3 +55,47 @@ impl Alerts {
         self.last_triggered = None;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{AlertTriggerType, Alerts};
+    use rust_decimal::Decimal;
+
+    #[test]
+    fn test_scan_gte_triggered() {
+        let mut alerts = Alerts::new();
+        alerts.add_alert(Decimal::from(100), AlertTriggerType::Gte);
+
+        let triggered = alerts.scan(Decimal::from(90), Decimal::from(110));
+
+        assert_eq!(triggered.len(), 1);
+        assert_eq!(triggered[0].price, Decimal::from(100));
+        assert!(alerts.alerts.is_empty());
+        assert_eq!(alerts.last_triggered.unwrap().price, Decimal::from(100));
+    }
+
+    #[test]
+    fn test_scan_lte_triggered() {
+        let mut alerts = Alerts::new();
+        alerts.add_alert(Decimal::from(50), AlertTriggerType::Lte);
+
+        let triggered = alerts.scan(Decimal::from(40), Decimal::from(60));
+
+        assert_eq!(triggered.len(), 1);
+        assert_eq!(triggered[0].price, Decimal::from(50));
+        assert!(alerts.alerts.is_empty());
+        assert_eq!(alerts.last_triggered.unwrap().price, Decimal::from(50));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut alerts = Alerts::new();
+        alerts.add_alert(Decimal::from(100), AlertTriggerType::Gte);
+        alerts.add_alert(Decimal::from(50), AlertTriggerType::Lte);
+
+        alerts.clear();
+
+        assert!(alerts.alerts.is_empty());
+        assert!(alerts.last_triggered.is_none());
+    }
+}

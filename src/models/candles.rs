@@ -202,6 +202,30 @@ mod tests {
         let last_candle = buffer.last().unwrap();
         assert_eq!(last_candle.open_time, candle5.open_time);
     }
+
+    #[test]
+    fn test_to_candle() {
+        let mut buffer = CandlesState::new(5, Interval::M1);
+
+        let candle1 = create_candle(0, "100.0", "110.0", "90.0", "105.0", "1000.0");
+        let candle2 = create_candle(60_000, "105.0", "115.0", "95.0", "110.0", "1500.0");
+        let candle3 = create_candle(120_000, "110.0", "120.0", "100.0", "115.0", "2000.0");
+
+        buffer.push(candle1);
+        buffer.push(candle2);
+        buffer.push(candle3);
+
+        let aggregated_candle = buffer.to_candle(&Interval::M5).unwrap();
+        assert_eq!(aggregated_candle.open_time, Timestamp::from_milliseconds(0));
+        assert_eq!(aggregated_candle.open, Decimal::from_str("100.0").unwrap());
+        assert_eq!(aggregated_candle.high, Decimal::from_str("120.0").unwrap());
+        assert_eq!(aggregated_candle.low, Decimal::from_str("90.0").unwrap());
+        assert_eq!(aggregated_candle.close, Decimal::from_str("115.0").unwrap());
+        assert_eq!(
+            aggregated_candle.volume,
+            Decimal::from_str("4500.0").unwrap()
+        );
+    }
 }
 
 pub type SharedCandlesState = Arc<RwLock<CandlesState>>;

@@ -128,7 +128,7 @@ fn main() {
                     .send(Log::new(
                         LogLevel::Info,
                         format!("Price alert triggered at {:.8}", alert.price),
-                        Some(Sound::OrderFilled),
+                        Some(Sound::Alert),
                     ))
                     .unwrap();
                 force_redraw = true;
