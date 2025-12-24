@@ -2,6 +2,7 @@ use super::base::errors::ExchangeError;
 use super::base::exchange::Exchange;
 use super::binance_spot::BinanceSpotExchange;
 use super::binance_usd_futures::BinanceUSDFuturesExchange;
+use super::gateio_usd_futures::GateioUSDFuturesExchange;
 use crate::models::Config;
 use crate::models::{Log, Order};
 use std::sync::mpsc::Sender;
@@ -33,6 +34,14 @@ impl ExchangeFactory {
                 logs_sender,
                 config.binance_access_key.clone(),
                 config.binance_secret_key.clone(),
+            ))),
+            "gateio_usd_futures" => Ok(Box::new(GateioUSDFuturesExchange::new(
+                symbol,
+                candles_limit,
+                orders_sender,
+                logs_sender,
+                config.gateio_access_key.clone(),
+                config.gateio_secret_key.clone(),
             ))),
             _ => Err(ExchangeError::UnknownExchange(name.to_string())),
         }
