@@ -1,3 +1,4 @@
+mod alerts;
 mod candles;
 mod color;
 mod color_schema;
@@ -9,12 +10,12 @@ mod open_interest;
 mod order_book;
 mod order_flow;
 mod orders;
-mod price_alerts;
 mod shared_state;
 mod sound;
 mod symbol;
 mod timestamp;
 
+pub use alerts::{Alert, AlertTriggerType, Alerts};
 pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use color::Color;
 pub use color_schema::ColorSchema;
@@ -27,7 +28,6 @@ pub use open_interest::{OpenInterestState, SharedOpenInterestState};
 pub use order_book::{OrderBookState, SharedOrderBookState};
 pub use order_flow::{OrderFlowState, SharedOrderFlowState};
 pub use orders::{NewOrder, Order, OrderSide, OrderStatus, OrderType, Orders};
-pub use price_alerts::{PriceAlert, PriceAlerts, TriggerType};
 pub use shared_state::SharedState;
 pub use sound::Sound;
 pub use symbol::Symbol;

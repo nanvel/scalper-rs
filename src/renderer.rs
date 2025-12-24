@@ -1,6 +1,6 @@
 use crate::models::{
-    CandlesState, ColorSchema, Interval, Layout, OpenInterestState, OrderBookState, OrderFlowState,
-    OrderSide, PriceAlerts, SharedState, Status, Timestamp,
+    Alerts, CandlesState, ColorSchema, Interval, Layout, OpenInterestState, OrderBookState,
+    OrderFlowState, OrderSide, SharedState, Status, Timestamp,
 };
 use crate::trader::Trader;
 use chrono::Utc;
@@ -121,7 +121,7 @@ impl Renderer {
         trader: &Trader,
         status: Status,
         interval: Interval,
-        price_alerts: &PriceAlerts,
+        alerts: &Alerts,
         locked: bool,
         force_redraw: bool,
     ) {
@@ -149,7 +149,7 @@ impl Renderer {
         let scale_step = self.scale_step();
 
         if self.candles_updated != candles_updated || self.force_redraw {
-            self.draw_orders(trader, price, scale_step, price_alerts);
+            self.draw_orders(trader, price, scale_step, alerts);
             self.draw_candles(
                 &shared_state.candles.read().unwrap(),
                 &shared_state.open_interest.read().unwrap(),
@@ -191,7 +191,7 @@ impl Renderer {
         trader: &Trader,
         price: Decimal,
         scale_step: Decimal,
-        price_alerts: &PriceAlerts,
+        alerts: &Alerts,
     ) {
         let area = self.layout.orders_area;
 
@@ -291,7 +291,7 @@ impl Renderer {
             );
         }
 
-        for price_alert in price_alerts.alerts.iter() {
+        for price_alert in alerts.alerts.iter() {
             let y = self.price_to_px(price_alert.price);
 
             let mut pb = PathBuilder::new();
@@ -338,7 +338,7 @@ impl Renderer {
             );
         }
 
-        if let Some(alert) = price_alerts.last_triggered {
+        if let Some(alert) = alerts.last_triggered {
             let y = self.price_to_px(alert.price);
             let mut pb = PathBuilder::new();
             pb.move_to(area.left as f32 + 3_f32, y as f32);

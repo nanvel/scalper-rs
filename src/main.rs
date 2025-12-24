@@ -14,7 +14,7 @@ use font_kit::family_name::FamilyName;
 use font_kit::properties::Properties;
 use font_kit::source::SystemSource;
 use minifb::{Key, MouseButton, MouseMode, Window, WindowOptions};
-use models::{ColorSchema, Config, Interval, LogManager, PriceAlert, PriceAlerts, TriggerType};
+use models::{AlertTriggerType, Alerts, ColorSchema, Config, Interval, LogManager};
 use rust_decimal::Decimal;
 use std::sync::mpsc;
 
@@ -50,7 +50,7 @@ fn main() {
         std::process::exit(1);
     });
 
-    let mut price_alerts = PriceAlerts::new();
+    let mut alerts = Alerts::new();
 
     let mut window = Window::new(
         &format!("{} - {}", symbol.slug, exchange.name()),
@@ -123,7 +123,7 @@ fn main() {
         force_redraw = force_redraw || consume_orders(&mut trader);
 
         if trader.bid.is_some() && trader.ask.is_some() {
-            for alert in price_alerts.scan(trader.bid.unwrap(), trader.ask.unwrap()) {
+            for alert in alerts.scan(trader.bid.unwrap(), trader.ask.unwrap()) {
                 logs_sender
                     .send(Log::new(
                         LogLevel::Info,
@@ -236,12 +236,12 @@ fn main() {
                         force_redraw = true;
                     }
                 } else if shift_pressed && trader.bid.is_some() {
-                    price_alerts.add_alert(
+                    alerts.add_alert(
                         price,
                         if trader.bid.unwrap() >= price {
-                            TriggerType::Lte
+                            AlertTriggerType::Lte
                         } else {
-                            TriggerType::Gte
+                            AlertTriggerType::Gte
                         },
                     );
                     force_redraw = true;
@@ -254,7 +254,7 @@ fn main() {
             for o in trader.get_open_orders() {
                 exchange.cancel_order(o.id.clone());
             }
-            price_alerts.clear();
+            alerts.clear();
             force_redraw = true;
         }
 
@@ -292,7 +292,7 @@ fn main() {
             &trader,
             logs_manager.status(),
             interval,
-            &price_alerts,
+            &alerts,
             ctrl_pressed,
             force_redraw,
         );
