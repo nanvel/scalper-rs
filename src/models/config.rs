@@ -36,6 +36,9 @@ pub struct Config {
 
     #[serde(default)]
     pub sound: bool,
+
+    #[serde(default)]
+    pub cleanup_on_shutdown: bool,
 }
 
 #[derive(Parser, Debug)]

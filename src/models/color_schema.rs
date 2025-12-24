@@ -29,6 +29,7 @@ pub struct ColorSchema {
     pub volume_buy: Color,
     pub volume_sell: Color,
     pub open_interest: Color,
+    pub alert: Color,
 
     pub text_light: Color,
     pub text_dark: Color,
@@ -53,7 +54,7 @@ impl ColorSchema {
 
             // Base colors
             background: Color::new(17, 24, 39, 255), // #111827
-            status_bar_background: Color::new(31, 41, 55, 255), // #1F2937
+            status_bar_background: Color::new(22, 30, 46, 255), // #161E2E
 
             // Candles
             bullish_candle: Color::new(34, 197, 94, 255), // #22C55E
@@ -67,6 +68,8 @@ impl ColorSchema {
             volume_sell: Color::new(239, 68, 68, 128), // #EF4444 at 50% opacity
 
             open_interest: Color::new(148, 163, 184, 128), // #94A3B8 at 50% opacity
+
+            alert: Color::new(255, 255, 255, 128), // #FFFFFF at 50% opacity
 
             // Text colors
             text_light: Color::new(229, 231, 235, 255), // #E5E7EB
@@ -94,7 +97,7 @@ impl ColorSchema {
 
             // Base colors
             background: Color::new(255, 255, 255, 255), // #FFFFFF
-            status_bar_background: Color::new(248, 249, 250, 255), // #F8F9FA
+            status_bar_background: Color::new(245, 245, 245, 255), // #F5F5F5
 
             // Candles
             bullish_candle: Color::new(16, 185, 129, 255), // #10B981
@@ -109,6 +112,8 @@ impl ColorSchema {
 
             open_interest: Color::new(100, 116, 139, 128), // #64748B at 50% opacity
 
+            alert: Color::new(0, 0, 0, 128), // #000000 at 50% opacity
+
             // Text colors
             text_light: Color::new(31, 41, 55, 255), // #1F2937
             text_dark: Color::new(249, 250, 251, 255), // #F9FAFB
@@ -117,7 +122,7 @@ impl ColorSchema {
             text_error: Color::new(220, 38, 38, 255), // #DC2626
 
             // UI elements
-            border: Color::new(229, 231, 235, 255), // #E5E7EB
+            border: Color::new(220, 220, 220, 255), // #DCDCDC
             crosshair: Color::new(107, 114, 128, 255), // #6B7280
             scale_bar: Color::new(139, 92, 246, 255), // #8B5CF6
             sl_line: Color::new(220, 38, 38, 255),  // #DC2626

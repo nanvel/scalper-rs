@@ -1,3 +1,4 @@
+mod alerts;
 mod candles;
 mod color;
 mod color_schema;
@@ -14,6 +15,7 @@ mod sound;
 mod symbol;
 mod timestamp;
 
+pub use alerts::{Alert, AlertTriggerType, Alerts};
 pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use color::Color;
 pub use color_schema::ColorSchema;
