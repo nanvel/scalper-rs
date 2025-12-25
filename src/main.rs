@@ -188,6 +188,7 @@ fn main() {
 
         if window.is_key_pressed(Key::N, minifb::KeyRepeat::No) {
             shared_state.order_flow.write().unwrap().reset();
+            renderer.reset_volume_range();
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No) && shift_pressed {
