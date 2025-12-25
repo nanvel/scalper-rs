@@ -21,6 +21,9 @@ pub struct Config {
     pub binance_access_key: Option<String>,
     pub binance_secret_key: Option<String>,
 
+    pub gateio_access_key: Option<String>,
+    pub gateio_secret_key: Option<String>,
+
     #[serde(default = "default_size")]
     pub lot_size: Option<Decimal>,
     #[serde(default = "default_mult_1")]

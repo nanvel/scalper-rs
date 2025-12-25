@@ -15,13 +15,13 @@ mod sound;
 mod symbol;
 mod timestamp;
 
-pub use alerts::{Alert, AlertTriggerType, Alerts};
+pub use alerts::{AlertTriggerType, Alerts};
 pub use candles::{Candle, CandlesState, SharedCandlesState};
 pub use color::Color;
 pub use color_schema::ColorSchema;
 pub use config::Config;
 pub use interval::Interval;
-pub use layout::{Area, Layout};
+pub use layout::Layout;
 pub use logs::Status;
 pub use logs::{Log, LogLevel, LogManager};
 pub use open_interest::{OpenInterestState, SharedOpenInterestState};

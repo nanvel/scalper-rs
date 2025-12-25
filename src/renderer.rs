@@ -1143,4 +1143,8 @@ impl Renderer {
         }
         Decimal::from(m as i32) * self.tick_size
     }
+
+    pub fn reset_volume_range(&mut self) {
+        self.book_entry_range = Decimal::ZERO;
+    }
 }

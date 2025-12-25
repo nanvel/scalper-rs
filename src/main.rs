@@ -92,7 +92,7 @@ fn main() {
 
     prevent_sleep();
 
-    let mut consume_orders = |trader: &mut Trader| {
+    let consume_orders = |trader: &mut Trader| {
         let mut consumed = false;
         match orders_receiver.try_recv() {
             Ok(value) => {
@@ -128,7 +128,7 @@ fn main() {
                     .send(Log::new(
                         LogLevel::Info,
                         format!("Price alert triggered at {:.8}", alert.price),
-                        Some(Sound::OrderFilled),
+                        Some(Sound::Alert),
                     ))
                     .unwrap();
                 force_redraw = true;
@@ -188,6 +188,7 @@ fn main() {
 
         if window.is_key_pressed(Key::N, minifb::KeyRepeat::No) {
             shared_state.order_flow.write().unwrap().reset();
+            renderer.reset_volume_range();
         }
 
         if window.is_key_pressed(Key::Up, minifb::KeyRepeat::No) && shift_pressed {
@@ -220,7 +221,7 @@ fn main() {
 
         let left_pressed = window.get_mouse_down(MouseButton::Left);
         if left_pressed && !left_was_pressed {
-            if let Some((x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
+            if let Some((_x, y)) = window.get_mouse_pos(MouseMode::Clamp) {
                 let price = renderer.px_to_price(y as i32);
                 if ctrl_pressed {
                     if price > Decimal::ZERO {
