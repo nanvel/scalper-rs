@@ -2,6 +2,8 @@
 
 A desktop app for scalping (trading) written in Rust.
 
+![ui 2025-12-25](https://github.com/nanvel/scalper-rs/releases/download/0.0.1/ui_20251225.png)
+
 ## ⚠️ Disclaimer
 
 This software is provided for educational purposes only and is not financial advice.
