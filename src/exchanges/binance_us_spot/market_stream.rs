@@ -18,7 +18,7 @@ pub async fn start_market_stream(
     shared_order_flow_state: SharedOrderFlowState,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let ws_url = format!(
-        "wss://ws-api.binance.us:443/ws-api/v3/stream?streams={}@kline_1m/{}@depth@100ms/{}@aggTrade",
+        "wss://stream.binance.us:9443/stream?streams={}@kline_1m/{}@depth@100ms/{}@aggTrade",
         symbol.to_lowercase(),
         symbol.to_lowercase(),
         symbol.to_lowercase(),

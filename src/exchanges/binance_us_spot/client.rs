@@ -360,7 +360,7 @@ pub enum Filter {
     },
     #[serde(rename = "MIN_NOTIONAL")]
     MinNotional {
-        #[serde(rename = "notional")]
+        #[serde(rename = "minNotional")]
         notional: String,
     },
     #[serde(rename = "LOT_SIZE")]

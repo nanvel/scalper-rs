@@ -36,7 +36,7 @@ impl ExchangeFactory {
                 config.binance_access_key.clone(),
                 config.binance_secret_key.clone(),
             ))),
-            "binance_us_spot" => Ok(Box::new(BinanceSpotExchange::new(
+            "binance_us_spot" => Ok(Box::new(BinanceUSSpotExchange::new(
                 symbol,
                 candles_limit,
                 orders_sender,
