@@ -139,6 +139,6 @@ impl Config {
 
     fn config_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
         let home = dirs::home_dir().ok_or("No home directory.")?;
-        Ok(home.join(".scalper").join("config"))
+        Ok(home.join(".scalper-rs").join("config"))
     }
 }

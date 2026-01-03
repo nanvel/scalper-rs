@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2025-09-25
 
-## [0.2.0] - 2026-01-03
+## [1.0.0] - 2026-01-03
 
 ### Added
 
@@ -20,3 +20,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Binance [Algo API](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/rest-api/New-Algo-Order)
   for stop orders
 - Listen key refresh for Binance Futures
+- Config folder changed `$HOME/.scalper/config` -> `$HOME/.scalper-rs/config`
