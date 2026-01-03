@@ -1,6 +1,7 @@
 use super::base::errors::ExchangeError;
 use super::base::exchange::Exchange;
 use super::binance_spot::BinanceSpotExchange;
+use super::binance_us_spot::BinanceUSSpotExchange;
 use super::binance_usd_futures::BinanceUSDFuturesExchange;
 use super::gateio_usd_futures::GateioUSDFuturesExchange;
 use crate::models::Config;
@@ -28,6 +29,14 @@ impl ExchangeFactory {
                 config.binance_secret_key.clone(),
             ))),
             "binance_spot" => Ok(Box::new(BinanceSpotExchange::new(
+                symbol,
+                candles_limit,
+                orders_sender,
+                logs_sender,
+                config.binance_access_key.clone(),
+                config.binance_secret_key.clone(),
+            ))),
+            "binance_us_spot" => Ok(Box::new(BinanceUSSpotExchange::new(
                 symbol,
                 candles_limit,
                 orders_sender,

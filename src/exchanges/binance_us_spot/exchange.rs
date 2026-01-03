@@ -1,11 +1,9 @@
 use super::client::BinanceClient;
 use super::market_stream::start_market_stream;
-use super::open_interest_stream::start_open_interest_stream;
-use super::orders_stream::start_orders_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
     CandlesState, Interval, Log, LogLevel, NewOrder, OpenInterestState, Order, OrderBookState,
-    OrderFlowState, OrderType, SharedCandlesState, SharedState, Symbol,
+    OrderFlowState, SharedCandlesState, SharedState, Symbol,
 };
 use std::sync::{Arc, RwLock, mpsc::Sender};
 use std::thread;
@@ -14,7 +12,7 @@ use tokio::runtime;
 use tokio::sync::oneshot;
 use tokio::time::sleep;
 
-pub struct BinanceUSDFuturesExchange {
+pub struct BinanceUSSpotExchange {
     name: &'static str,
     symbol: String,
     candles_limit: usize,
@@ -26,7 +24,7 @@ pub struct BinanceUSDFuturesExchange {
     handle: Option<thread::JoinHandle<()>>,
 }
 
-impl Exchange for BinanceUSDFuturesExchange {
+impl Exchange for BinanceUSSpotExchange {
     fn name(&self) -> &str {
         self.name
     }
@@ -49,28 +47,12 @@ impl Exchange for BinanceUSDFuturesExchange {
         let candles_clone = shared_candles_state.clone();
         let order_book_clone = shared_order_book_state.clone();
         let order_flow_clone = shared_order_flow_state.clone();
-        let open_interest_clone = shared_open_interest_state.clone();
 
         let logs_sender_clone = self.logs_sender.clone();
-        let orders_sender_clone = self.orders_sender.clone();
 
         let client_clone = self.client.clone();
 
         self.set_interval(interval);
-
-        let keep_listen_key_alive = async |client: &BinanceClient, logs_sender: &Sender<Log>| {
-            loop {
-                sleep(Duration::from_mins(30)).await;
-                if client.has_auth() {
-                    let _ = client.refresh_listen_key().await;
-                    let _ = logs_sender.send(Log::new(
-                        LogLevel::Info,
-                        "Refreshed listen key".to_string(),
-                        None,
-                    ));
-                }
-            }
-        };
 
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
@@ -92,34 +74,22 @@ impl Exchange for BinanceUSDFuturesExchange {
                         order_flow_clone,
                     ) => {
                         if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e), None)).ok();
+                            logs_sender_clone.send(
+                                Log::new(
+                                    LogLevel::Error("CONN".to_string()),
+                                    format!("{:?}", e),
+                                    None,
+                                )).ok();
                         }
                     }
-
-                    res = start_open_interest_stream(
-                        &client_clone,
-                        open_interest_clone,
-                    ) => {
-                        if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e), None)).ok();
-                        }
-                    }
-
-                    res = start_orders_stream(
-                        &client_clone,
-                        &symbol_clone,
-                        &logs_sender_clone,
-                        orders_sender_clone,
-                    ) => {
-                        if let Err(e) = res {
-                            logs_sender_clone.send(Log::new(LogLevel::Error("CONN".to_string()), format!("{:?}", e), None)).ok();
-                        }
-                    }
-
-                    _ = keep_listen_key_alive(&client_clone, &logs_sender_clone) => {}
 
                     _ = shutdown_rx => {
-                        logs_sender_clone.send(Log::new(LogLevel::Info, "Shutting down market stream listener".to_string(), None)).ok();
+                        logs_sender_clone.send(
+                            Log::new(
+                                LogLevel::Info,
+                                "Shutting down market stream listener".to_string(),
+                                None,
+                            )).ok();
                     }
                 }
 
@@ -174,61 +144,24 @@ impl Exchange for BinanceUSDFuturesExchange {
         }
     }
 
-    fn place_order(&self, new_order: NewOrder) -> () {
-        let client = self.client.clone();
-        let sender_clone = self.orders_sender.clone();
-        let logs_sender_clone = self.logs_sender.clone();
-        thread::spawn(move || {
-            let order = match new_order.order_type {
-                OrderType::Stop => client.place_stop_order_sync(new_order),
-                _ => client.place_order_sync(new_order),
-            };
-            match order {
-                Ok(order) => sender_clone.send(order).unwrap(),
-                Err(e) => {
-                    logs_sender_clone
-                        .send(Log::new(
-                            LogLevel::Warning("WARN".to_string(), None),
-                            format!("Failed to create order: {:?}", e),
-                            None,
-                        ))
-                        .unwrap();
-                }
-            };
-        });
+    fn place_order(&self, _new_order: NewOrder) -> () {
+        let _ = self.logs_sender.send(Log::new(
+            LogLevel::Warning("NA".to_string(), None),
+            format!("Trading is not supported on {}", self.name()).to_string(),
+            None,
+        ));
     }
 
-    fn cancel_order(&self, order: Order) -> () {
-        let client = self.client.clone();
-        let orders_sender_clone = self.orders_sender.clone();
-        let logs_sender_clone = self.logs_sender.clone();
-        thread::spawn(move || {
-            let result = match order.order_type {
-                OrderType::Stop => client.cancel_stop_order_sync(&order),
-                _ => client.cancel_order_sync(&order),
-            };
-            match result {
-                Ok(order) => {
-                    orders_sender_clone.send(order).unwrap();
-                }
-                Err(e) => {
-                    logs_sender_clone
-                        .send(Log::new(
-                            LogLevel::Warning("WARN".to_string(), None),
-                            format!("Failed to cancel order {}: {:?}", order.id, e),
-                            None,
-                        ))
-                        .unwrap();
-                    if let Ok(order) = client.get_order_sync(&order.id) {
-                        orders_sender_clone.send(order).unwrap();
-                    }
-                }
-            }
-        });
+    fn cancel_order(&self, _order: Order) -> () {
+        let _ = self.logs_sender.send(Log::new(
+            LogLevel::Warning("NA".to_string(), None),
+            format!("Trading is not supported on {}", self.name()).to_string(),
+            None,
+        ));
     }
 }
 
-impl BinanceUSDFuturesExchange {
+impl BinanceUSSpotExchange {
     pub fn new(
         symbol: String,
         candles_limit: usize,
@@ -244,7 +177,7 @@ impl BinanceUSDFuturesExchange {
         ));
 
         Self {
-            name: "Binance USD Futures",
+            name: "Binance.US Spot",
             symbol,
             candles_limit,
             logs_sender,

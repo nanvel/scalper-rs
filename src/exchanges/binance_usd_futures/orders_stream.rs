@@ -127,9 +127,14 @@ fn process_filled_order(er: &ExecutionReport, orders_sender: &Sender<Order>) {
     };
     let commission = er.accumulated_executed_qty.unwrap() * er.avg_price.unwrap() * rate;
 
+    let order_id = match er.algo_order_id {
+        Some(id) => format!("algo-{}", id),
+        None => er.order_id.unwrap_or_default().to_string(),
+    };
+
     orders_sender
         .send(Order::new(
-            er.order_id.unwrap_or_default().to_string(),
+            order_id,
             order_type,
             order_side,
             order_status,
@@ -168,4 +173,6 @@ pub struct ExecutionReport {
     pub avg_price: Option<Decimal>,
     #[serde(rename = "sp")]
     pub stop_price: Option<Decimal>,
+    #[serde(rename = "si")]
+    pub algo_order_id: Option<u64>,
 }

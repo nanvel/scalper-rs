@@ -253,7 +253,7 @@ fn main() {
 
         if window.is_key_pressed(Key::C, minifb::KeyRepeat::No) {
             for o in trader.get_open_orders() {
-                exchange.cancel_order(o.id.clone());
+                exchange.cancel_order(o.clone());
             }
             alerts.clear();
             force_redraw = true;
@@ -269,7 +269,7 @@ fn main() {
                     trader.flat();
                     consume_orders(&mut trader);
                     for o in trader.get_open_orders() {
-                        exchange.cancel_order(o.id.clone());
+                        exchange.cancel_order(o.clone());
                     }
                     consume_orders(&mut trader);
                     trader.flat();
@@ -310,7 +310,7 @@ fn main() {
         trader.flat();
         consume_orders(&mut trader);
         for o in trader.get_open_orders() {
-            exchange.cancel_order(o.id.clone());
+            exchange.cancel_order(o.clone());
         }
         consume_orders(&mut trader);
         trader.flat();
