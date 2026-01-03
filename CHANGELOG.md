@@ -15,4 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Binance.US Spot exchange
 - Documentation for exchanges
-- `Exchange::cancel_order` now receive `Order` as argument 
+- `Exchange::cancel_order` now receive `Order` as argument
+- Use new
+  Binance [Algo API](https://developers.binance.com/docs/derivatives/usds-margined-futures/trade/rest-api/New-Algo-Order)
+  for stop orders
+- Listen key refresh for Binance Futures

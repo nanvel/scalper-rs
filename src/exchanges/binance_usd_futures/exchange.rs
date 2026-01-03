@@ -61,7 +61,7 @@ impl Exchange for BinanceUSDFuturesExchange {
         let keep_listen_key_alive = async |client: &BinanceClient, logs_sender: &Sender<Log>| {
             loop {
                 sleep(Duration::from_mins(30)).await;
-                if !client.has_auth() {
+                if client.has_auth() {
                     let _ = client.refresh_listen_key().await;
                     let _ = logs_sender.send(Log::new(
                         LogLevel::Info,
