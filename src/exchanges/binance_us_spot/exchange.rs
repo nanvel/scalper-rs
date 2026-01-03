@@ -152,7 +152,7 @@ impl Exchange for BinanceUSSpotExchange {
         ));
     }
 
-    fn cancel_order(&self, _order_id: String) -> () {
+    fn cancel_order(&self, _order: Order) -> () {
         let _ = self.logs_sender.send(Log::new(
             LogLevel::Warning("NA".to_string(), None),
             format!("Trading is not supported on {}", self.name()).to_string(),

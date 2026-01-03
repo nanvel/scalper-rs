@@ -1,4 +1,4 @@
-use crate::models::{Interval, NewOrder, SharedState, Symbol};
+use crate::models::{Interval, NewOrder, Order, SharedState, Symbol};
 
 pub trait Exchange: Send + Sync {
     /// Returns the exchange name that is being displayed in the window header.
@@ -23,5 +23,5 @@ pub trait Exchange: Send + Sync {
     fn place_order(&self, new_order: NewOrder) -> ();
 
     /// Cancels an existing order. Similar to `place_order`, this method should return immediately.
-    fn cancel_order(&self, order_id: String) -> ();
+    fn cancel_order(&self, order: Order) -> ();
 }

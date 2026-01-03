@@ -5,7 +5,7 @@ use super::orders_stream::start_orders_stream;
 use crate::exchanges::base::exchange::Exchange;
 use crate::models::{
     CandlesState, Interval, Log, LogLevel, NewOrder, OpenInterestState, Order, OrderBookState,
-    OrderFlowState, SharedCandlesState, SharedState, Symbol,
+    OrderFlowState, OrderType, SharedCandlesState, SharedState, Symbol,
 };
 use std::sync::{Arc, RwLock, mpsc::Sender};
 use std::thread;
@@ -177,30 +177,51 @@ impl Exchange for BinanceUSDFuturesExchange {
     fn place_order(&self, new_order: NewOrder) -> () {
         let client = self.client.clone();
         let sender_clone = self.orders_sender.clone();
+        let logs_sender_clone = self.logs_sender.clone();
         thread::spawn(move || {
-            let order = client.place_order_sync(new_order).unwrap();
-            sender_clone.send(order).unwrap();
+            let order = match new_order.order_type {
+                OrderType::Stop => client.place_stop_order_sync(new_order),
+                _ => client.place_order_sync(new_order),
+            };
+            match order {
+                Ok(order) => sender_clone.send(order).unwrap(),
+                Err(e) => {
+                    logs_sender_clone
+                        .send(Log::new(
+                            LogLevel::Warning("WARN".to_string(), None),
+                            format!("Failed to create order: {:?}", e),
+                            None,
+                        ))
+                        .unwrap();
+                }
+            };
         });
     }
 
-    fn cancel_order(&self, order_id: String) -> () {
+    fn cancel_order(&self, order: Order) -> () {
         let client = self.client.clone();
         let orders_sender_clone = self.orders_sender.clone();
         let logs_sender_clone = self.logs_sender.clone();
-        thread::spawn(move || match client.cancel_order_sync(&order_id) {
-            Ok(order) => {
-                orders_sender_clone.send(order).unwrap();
-            }
-            Err(e) => {
-                logs_sender_clone
-                    .send(Log::new(
-                        LogLevel::Warning("WARN".to_string(), None),
-                        format!("Failed to cancel order {}: {:?}", order_id, e),
-                        None,
-                    ))
-                    .unwrap();
-                if let Ok(order) = client.get_order_sync(&order_id) {
+        thread::spawn(move || {
+            let result = match order.order_type {
+                OrderType::Stop => client.cancel_stop_order_sync(&order),
+                _ => client.cancel_order_sync(&order),
+            };
+            match result {
+                Ok(order) => {
                     orders_sender_clone.send(order).unwrap();
+                }
+                Err(e) => {
+                    logs_sender_clone
+                        .send(Log::new(
+                            LogLevel::Warning("WARN".to_string(), None),
+                            format!("Failed to cancel order {}: {:?}", order.id, e),
+                            None,
+                        ))
+                        .unwrap();
+                    if let Ok(order) = client.get_order_sync(&order.id) {
+                        orders_sender_clone.send(order).unwrap();
+                    }
                 }
             }
         });

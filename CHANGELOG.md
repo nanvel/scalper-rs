@@ -14,3 +14,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Binance.US Spot exchange
+- Documentation for exchanges
+- `Exchange::cancel_order` now receive `Order` as argument 

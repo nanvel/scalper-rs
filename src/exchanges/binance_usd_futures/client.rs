@@ -391,7 +391,7 @@ impl BinanceClient {
         let order_type = match order.order_type {
             OrderType::Market => "MARKET",
             OrderType::Limit => "LIMIT",
-            OrderType::Stop => "STOP_MARKET",
+            OrderType::Stop => panic!("Use AlgoOrder for STOP orders!"),
         };
 
         let mut params = vec![
@@ -404,13 +404,8 @@ impl BinanceClient {
 
         if order.order_type == OrderType::Limit {
             params.push(("price", order.price.unwrap().to_string()));
-        } else if order.order_type == OrderType::Stop {
-            params.push(("stopPrice", order.price.unwrap().to_string()));
-        }
-
-        if matches!(order.order_type, OrderType::Limit) {
             params.push(("timeInForce", "GTC".to_string()));
-        };
+        }
 
         let resp: BinanceOrder = self.post_signed("/fapi/v1/order", params).await?;
 
@@ -442,17 +437,17 @@ impl BinanceClient {
         self.runtime.block_on(self.place_order(order))
     }
 
-    pub async fn cancel_order(&self, order_id: &str) -> Result<Order> {
+    pub async fn cancel_order(&self, order: &Order) -> Result<Order> {
         let params = vec![
             ("symbol", self.symbol.clone()),
-            ("orderId", order_id.to_string()),
+            ("orderId", order.id.to_string()),
         ];
         let resp: BinanceOrder = self.delete_signed("/fapi/v1/order", params).await?;
 
         let order_type = match resp.order_type.as_str() {
             "MARKET" => OrderType::Market,
             "LIMIT" => OrderType::Limit,
-            "STOP_MARKET" => OrderType::Stop,
+            "STOP_MARKET" => panic!("Use AlgoOrder for STOP orders!"),
             _ => return Err(BinanceError::ParseError("Unknown order type".to_string())),
         };
 
@@ -464,8 +459,8 @@ impl BinanceClient {
 
         Ok(Order {
             id: resp.order_id.to_string(),
-            order_type: order_type,
-            order_side: order_side,
+            order_type,
+            order_side,
             order_status: OrderStatus::Filled,
             quantity: resp.orig_qty,
             executed_quantity: resp.executed_qty,
@@ -477,8 +472,75 @@ impl BinanceClient {
         })
     }
 
-    pub fn cancel_order_sync(&self, order_id: &str) -> Result<Order> {
-        self.runtime.block_on(self.cancel_order(order_id))
+    pub fn cancel_order_sync(&self, order: &Order) -> Result<Order> {
+        self.runtime.block_on(self.cancel_order(order))
+    }
+
+    pub async fn place_stop_order(&self, order: NewOrder) -> Result<Order> {
+        let order_side = match order.order_side {
+            OrderSide::Buy => "BUY",
+            OrderSide::Sell => "SELL",
+        };
+
+        let params = vec![
+            ("algoType", "CONDITIONAL".to_string()),
+            ("symbol", self.symbol.clone()),
+            ("side", order_side.to_string()),
+            ("type", "STOP_MARKET".to_string()),
+            ("quantity", order.quantity.to_string()),
+            ("triggerPrice", order.price.unwrap().to_string()),
+        ];
+
+        let resp: BinanceStopOrder = self.post_signed("/fapi/v1/algoOrder", params).await?;
+
+        Ok(Order {
+            id: format!("algo-{}", resp.algo_id),
+            order_type: order.order_type.clone(),
+            order_side: order.order_side,
+            order_status: OrderStatus::Pending,
+            quantity: order.quantity,
+            executed_quantity: Decimal::ZERO,
+            price: order.price.unwrap(),
+            average_price: Decimal::ZERO,
+            commission: Decimal::ZERO,
+            timestamp: Timestamp::from_milliseconds(resp.update_time),
+            is_update: false,
+        })
+    }
+
+    pub fn place_stop_order_sync(&self, order: NewOrder) -> Result<Order> {
+        self.runtime.block_on(self.place_stop_order(order))
+    }
+
+    pub async fn cancel_stop_order(&self, order: &Order) -> Result<Order> {
+        let algo_id = order
+            .id
+            .strip_prefix("algo-")
+            .ok_or_else(|| BinanceError::ParseError("Invalid algo order ID".to_string()))?;
+
+        let params = vec![
+            ("symbol", self.symbol.clone()),
+            ("algoId", algo_id.to_string()),
+        ];
+        let _: BinanceCancelStopOrder = self.delete_signed("/fapi/v1/algoOrder", params).await?;
+
+        Ok(Order {
+            id: order.id.to_string(),
+            order_type: order.order_type.clone(),
+            order_side: order.order_side.clone(),
+            order_status: OrderStatus::Filled,
+            quantity: Decimal::ZERO,
+            executed_quantity: Decimal::ZERO,
+            price: order.price.clone(),
+            average_price: Decimal::ZERO,
+            commission: Decimal::ZERO,
+            timestamp: Timestamp::now(),
+            is_update: true,
+        })
+    }
+
+    pub fn cancel_stop_order_sync(&self, order: &Order) -> Result<Order> {
+        self.runtime.block_on(self.cancel_stop_order(order))
     }
 
     pub async fn create_listen_key(&self) -> Result<String> {
@@ -563,6 +625,20 @@ impl BinanceOrder {
         };
         self.executed_qty * self.avg_price * rate
     }
+}
+
+#[derive(Deserialize)]
+pub struct BinanceStopOrder {
+    #[serde(rename = "algoId")]
+    pub algo_id: u64,
+    #[serde(rename = "updateTime")]
+    pub update_time: u64,
+}
+
+#[derive(Deserialize)]
+pub struct BinanceCancelStopOrder {
+    #[serde(rename = "algoId")]
+    pub algo_id: u64,
 }
 
 #[derive(Deserialize)]
