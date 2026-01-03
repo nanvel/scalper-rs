@@ -59,9 +59,9 @@ Example:
 theme = 'dark'
 lot_size = 50
 lot_mult_1 = 1
-lot_mult_1 = 2
-lot_mult_1 = 4
-lot_mult_1 = 8
+lot_mult_2 = 2
+lot_mult_3 = 4
+lot_mult_4 = 8
 binance_access_key = 'Vb...'
 binance_secret_key = '6V...'
 sound = true
