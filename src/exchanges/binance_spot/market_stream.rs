@@ -1,4 +1,5 @@
 use super::client::BinanceClient;
+use crate::exchanges::binance_base::depth_sync::{DomSync, Market, parse_depth_update};
 use crate::models::{
     Candle, CandlesState, Interval, SharedCandlesState, SharedOrderBookState, SharedOrderFlowState,
     Timestamp,
@@ -7,7 +8,11 @@ use futures_util::stream::StreamExt;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 use std::str::FromStr;
+use std::time::{Duration, Instant};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
+
+/// Minimum time between REST depth snapshot requests while resyncing.
+const SNAPSHOT_RETRY_INTERVAL: Duration = Duration::from_secs(1);
 
 pub async fn start_market_stream(
     client: &BinanceClient,
@@ -34,56 +39,47 @@ pub async fn start_market_stream(
         candles_state_1m.push(c);
     }
 
-    let depth_snapshot = client.get_depth(dom_limit).await?;
-    {
-        let bids: Vec<(Decimal, Decimal)> = depth_snapshot
-            .bids
-            .iter()
-            .filter_map(|b| {
-                let price = Decimal::from_str(&b[0]).ok()?;
-                let qty = Decimal::from_str(&b[1]).ok()?;
-                Some((price, qty))
-            })
-            .collect();
-        let asks: Vec<(Decimal, Decimal)> = depth_snapshot
-            .asks
-            .iter()
-            .filter_map(|a| {
-                let price = Decimal::from_str(&a[0]).ok()?;
-                let qty = Decimal::from_str(&a[1]).ok()?;
-                Some((price, qty))
-            })
-            .collect();
-
-        let mut buffer = shared_dom_state.write().unwrap();
-        buffer.init_snapshot(bids, asks);
-    }
+    // Binance's diff-depth procedure: buffer the stream, take a snapshot that
+    // bridges it, then check every event's sequence ids and resync on a gap.
+    let mut dom_sync = DomSync::new(Market::Spot);
+    let mut last_snapshot_request: Option<Instant> = None;
 
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
                 if let Some(data) = extract_inner(&text) {
-                    if let Ok(event) = serde_json::from_value::<DepthUpdateEvent>(data.clone()) {
-                        let mut buffer = shared_dom_state.write().unwrap();
-                        if event.update_id <= depth_snapshot.last_update_id {
+                    if data.get("e").and_then(|e| e.as_str()) == Some("depthUpdate") {
+                        let Ok(update) = parse_depth_update(&data.to_string()) else {
                             continue;
-                        }
-                        for b in event.bids.iter() {
-                            if let (Ok(price), Ok(qty)) =
-                                (Decimal::from_str(&b[0]), Decimal::from_str(&b[1]))
-                            {
-                                buffer.update_bid(price, qty);
+                        };
+                        {
+                            let mut buffer = shared_dom_state.write().unwrap();
+                            dom_sync.on_update(update, &mut buffer);
+                            if let Some(event_time) = data.get("E").and_then(|t| t.as_u64()) {
+                                buffer.updated = Timestamp::from_milliseconds(event_time);
                             }
                         }
-                        for a in event.asks.iter() {
-                            if let (Ok(price), Ok(qty)) =
-                                (Decimal::from_str(&a[0]), Decimal::from_str(&a[1]))
-                            {
-                                buffer.update_ask(price, qty);
+                        let throttled = last_snapshot_request
+                            .is_some_and(|at| at.elapsed() < SNAPSHOT_RETRY_INTERVAL);
+                        if dom_sync.needs_snapshot() && !throttled {
+                            last_snapshot_request = Some(Instant::now());
+                            match client.get_depth(dom_limit).await {
+                                Ok(snapshot)
+                                    if !dom_sync.snapshot_is_too_old(snapshot.last_update_id) =>
+                                {
+                                    let mut buffer = shared_dom_state.write().unwrap();
+                                    dom_sync.on_snapshot(
+                                        snapshot.last_update_id,
+                                        &snapshot.bids,
+                                        &snapshot.asks,
+                                        &mut buffer,
+                                    );
+                                }
+                                // Older than the buffered events: fetch again on a later event.
+                                Ok(_) => {}
+                                Err(e) => eprintln!("Depth snapshot error: {}", e),
                             }
                         }
-                        buffer.updated = Timestamp::from_milliseconds(event.event_time);
-                        buffer.online = true;
                     } else if let Ok(event) = serde_json::from_value::<AggTradeEvent>(data.clone())
                     {
                         if let (Ok(price), Ok(qty)) = (
@@ -174,18 +170,6 @@ struct KlineData {
     close: String,
     #[serde(rename = "v")]
     volume: String,
-}
-
-#[derive(Deserialize)]
-struct DepthUpdateEvent {
-    #[serde(rename = "u")]
-    update_id: u64,
-    #[serde(rename = "b")]
-    bids: Vec<[String; 2]>,
-    #[serde(rename = "a")]
-    asks: Vec<[String; 2]>,
-    #[serde(rename = "E")]
-    event_time: u64,
 }
 
 #[derive(Deserialize)]
